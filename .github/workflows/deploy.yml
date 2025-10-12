@@ -1,20 +1,20 @@
-name: 🚀 Auto Deploy FastAPI + Next.js
+name: 🚀 Deploy FastAPI + Next.js
 
 on:
   push:
     branches:
-      - main
+      - main  # Trigger deployment on push to main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout code in GitHub Actions runner (optional)
+      # 1️⃣ Checkout code (optional, mostly for logs)
       - name: Checkout Repo
         uses: actions/checkout@v4
 
-      # 2️⃣ SSH into VPS and run deploy commands
+      # 2️⃣ SSH into VPS and deploy
       - name: Deploy on VPS via git pull
         uses: appleboy/ssh-action@v0.1.8
         with:
@@ -25,21 +25,24 @@ jobs:
             echo "🔄 Navigate to project folder..."
             cd /root/utu/Abhaydhir
 
-            echo "🔄 Pull latest code from GitHub..."
-            git reset --hard
-            git clean -fd
-            git pull origin main
+            echo "🔄 Pull latest code from GitHub using SSH key..."
+            GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git reset --hard
+            GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git clean -fd
+            GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git pull origin main
 
             echo "🐍 Backend setup (system Python)..."
             cd backend-fastapi
             # Using system Python, dependencies already installed
 
-            echo "🧱 Build Next.js frontend..."
+            echo "🧱 Building Next.js frontend..."
             cd ../web-next
             npm install
             npm run build
 
-            echo "♻️ Restart FastAPI backend..."
+            echo "♻️ Restarting FastAPI backend..."
             sudo systemctl restart fastapi || true
+
+            echo "♻️ Restarting Next.js frontend..."
+            sudo systemctl restart nextjs || true
 
             echo "✅ Deployment completed successfully!"

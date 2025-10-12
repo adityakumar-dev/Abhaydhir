@@ -10,11 +10,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout repo in Actions runner
+      # 1️⃣ Checkout repo
       - name: Checkout Repo
         uses: actions/checkout@v4
 
-      # 2️⃣ Copy all files to VPS
+      # 2️⃣ Debug: check secrets
+      - name: Debug secrets
+        run: |
+          echo "Host: ${{ secrets.VPS_HOST }}"
+          echo "User: ${{ secrets.VPS_USER }}"
+
+      # 3️⃣ Copy all files to VPS via SCP
       - name: Copy files to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -25,7 +31,7 @@ jobs:
           source: "."
           target: "/root/utu/Abhaydhir"
 
-      # 3️⃣ Run deployment commands on VPS
+      # 4️⃣ Run deployment commands on VPS
       - name: Deploy on VPS
         uses: appleboy/ssh-action@v0.1.8
         with:
@@ -34,19 +40,22 @@ jobs:
           key: |
             ${{ secrets.VPS_SSH_KEY }}
           script: |
-            echo "🐍 Backend setup (system Python)..."
-            cd /root/utu/Abhaydhir/backend-fastapi
-            # No virtualenv; dependencies already installed
+            echo "🔄 Navigate to project folder..."
+            cd /root/utu/Abhaydhir
 
-            echo "🧱 Building Next.js frontend..."
+            echo "🐍 Backend setup (system Python)..."
+            cd backend-fastapi
+            # No venv; dependencies already installed
+
+            echo "🧱 Build Next.js frontend..."
             cd ../web-next
             npm install
             npm run build
 
-            echo "♻️ Restarting FastAPI backend..."
+            echo "♻️ Restart FastAPI backend..."
             sudo systemctl restart fastapi || true
 
-            echo "♻️ Restarting Next.js frontend..."
+            echo "♻️ Restart Next.js frontend..."
             sudo systemctl restart nextjs || true
 
             echo "✅ Deployment completed successfully!"

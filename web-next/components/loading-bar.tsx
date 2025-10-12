@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 
-export function LoadingBar() {
+function LoadingBarContent() {
   const [loading, setLoading] = useState(false)
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -23,5 +23,13 @@ export function LoadingBar() {
         <div className="h-1 bg-blue-600 transition-all duration-300 ease-in-out animate-loading-bar" />
       </div>
     </div>
+  )
+}
+
+export function LoadingBar() {
+  return (
+    <Suspense fallback={null}>
+      <LoadingBarContent />
+    </Suspense>
   )
 } 

@@ -68,7 +68,6 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
   const [loadingMessage, setLoadingMessage] = useState("");
   const [isLoadingOverlayOpen, setIsLoadingOverlayOpen] = useState(false);
 
-  const [registrationData, setRegistrationData] = useState<RegistrationOptions | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [download,setDownload] = useState<boolean>(false)
   const [isDownloadPopupOpen, setIsDownloadPopupOpen] = useState(false);

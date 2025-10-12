@@ -3,24 +3,25 @@ name: 🚀 Deploy FastAPI + Next.js
 on:
   push:
     branches:
-      - main  # Trigger deployment on push to main
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout code (optional, mostly for logs)
-      - name: Checkout Repo
+      # 1️⃣ Checkout repo (optional)
+      - name: Checkout code
         uses: actions/checkout@v4
 
       # 2️⃣ SSH into VPS and deploy
-      - name: Deploy on VPS via git pull
+      - name: Deploy on VPS
         uses: appleboy/ssh-action@v0.1.8
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
+          key: |
+            ${{ secrets.VPS_SSH_KEY }}
           script: |
             echo "🔄 Navigate to project folder..."
             cd /root/utu/Abhaydhir

@@ -10,11 +10,22 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout repo (optional)
-      - name: Checkout code
+      # 1️⃣ Checkout repo in Actions runner
+      - name: Checkout Repo
         uses: actions/checkout@v4
 
-      # 2️⃣ SSH into VPS and deploy
+      # 2️⃣ Copy all files to VPS
+      - name: Copy files to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: |
+            ${{ secrets.VPS_SSH_KEY }}
+          source: "."
+          target: "/root/utu/Abhaydhir"
+
+      # 3️⃣ Run deployment commands on VPS
       - name: Deploy on VPS
         uses: appleboy/ssh-action@v0.1.8
         with:
@@ -23,17 +34,9 @@ jobs:
           key: |
             ${{ secrets.VPS_SSH_KEY }}
           script: |
-            echo "🔄 Navigate to project folder..."
-            cd /root/utu/Abhaydhir
-
-            echo "🔄 Pull latest code from GitHub using SSH key..."
-            GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git reset --hard
-            GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git clean -fd
-            GIT_SSH_COMMAND='ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no' git pull origin main
-
             echo "🐍 Backend setup (system Python)..."
-            cd backend-fastapi
-            # Using system Python, dependencies already installed
+            cd /root/utu/Abhaydhir/backend-fastapi
+            # No virtualenv; dependencies already installed
 
             echo "🧱 Building Next.js frontend..."
             cd ../web-next

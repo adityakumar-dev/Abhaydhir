@@ -1,11 +1,17 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:spring_admin/apis/server_api.dart';
 import 'package:spring_admin/utils/event_required_mixin.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:intl/intl.dart';
 
 import 'view_guest.dart';
 
@@ -299,6 +305,13 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
                 fontSize: 20,
               ),
             ),
+            actions: [
+              IconButton(
+                icon: Icon(Icons.download, color: Color(0xFF1A237E)),
+                tooltip: 'Download Entry Data',
+                onPressed: _showDownloadDialog,
+              ),
+            ],
           ),
         ),
       ),
@@ -754,5 +767,520 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
     } catch (e) {
       return dateStr;
     }
+  }
+
+  /// Show download dialog with date range picker
+  void _showDownloadDialog() async {
+    final eventId = getEventId(context);
+    if (eventId == null) {
+      Fluttertoast.showToast(
+        msg: "No event selected",
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+      return;
+    }
+
+    // Show loading dialog while fetching date range
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      // Fetch available date range from backend
+      final dateRangeData = await ServerApi.getEventEntryDateRange(eventId);
+      
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading dialog
+
+      if (dateRangeData == null) {
+        Fluttertoast.showToast(
+          msg: "Failed to fetch date range",
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
+        );
+        return;
+      }
+
+      final entryDateRange = dateRangeData['entry_date_range'] as Map<String, dynamic>?;
+      final hasEntries = entryDateRange?['has_entries'] ?? false;
+      
+      if (!hasEntries) {
+        Fluttertoast.showToast(
+          msg: "No entry records found for this event",
+          backgroundColor: Colors.orange,
+          textColor: Colors.white,
+        );
+        return;
+      }
+
+      final firstEntryDate = entryDateRange?['first_entry_date'] as String?;
+      final lastEntryDate = entryDateRange?['last_entry_date'] as String?;
+
+      if (firstEntryDate == null || lastEntryDate == null) {
+        Fluttertoast.showToast(
+          msg: "Invalid date range",
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
+        );
+        return;
+      }
+
+      // Parse dates
+      final firstDate = DateTime.parse(firstEntryDate);
+      final lastDate = DateTime.parse(lastEntryDate);
+
+      // Show download dialog with date range options
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (context) => _DownloadDialog(
+          eventId: eventId,
+          firstEntryDate: firstDate,
+          lastEntryDate: lastDate,
+          eventName: dateRangeData['event']?['name'] ?? 'Event',
+        ),
+      );
+
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading dialog if still open
+      
+      debugPrint('Error fetching date range: $e');
+      Fluttertoast.showToast(
+        msg: "Error: ${e.toString()}",
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+    }
+  }
+}
+
+/// Download Dialog Widget
+class _DownloadDialog extends StatefulWidget {
+  final int eventId;
+  final DateTime firstEntryDate;
+  final DateTime lastEntryDate;
+  final String eventName;
+
+  const _DownloadDialog({
+    required this.eventId,
+    required this.firstEntryDate,
+    required this.lastEntryDate,
+    required this.eventName,
+  });
+
+  @override
+  State<_DownloadDialog> createState() => _DownloadDialogState();
+}
+
+class _DownloadDialogState extends State<_DownloadDialog> {
+  DateTime? selectedFromDate;
+  DateTime? selectedToDate;
+  bool isDownloading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Default to full range
+    selectedFromDate = widget.firstEntryDate;
+    selectedToDate = widget.lastEntryDate;
+  }
+
+  Future<void> _selectFromDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: selectedFromDate ?? widget.firstEntryDate,
+      firstDate: widget.firstEntryDate,
+      lastDate: widget.lastEntryDate,
+      helpText: 'Select Start Date',
+    );
+
+    if (picked != null) {
+      setState(() {
+        selectedFromDate = picked;
+        // Ensure toDate is not before fromDate
+        if (selectedToDate != null && selectedToDate!.isBefore(picked)) {
+          selectedToDate = picked;
+        }
+      });
+    }
+  }
+
+  Future<void> _selectToDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: selectedToDate ?? widget.lastEntryDate,
+      firstDate: selectedFromDate ?? widget.firstEntryDate,
+      lastDate: widget.lastEntryDate,
+      helpText: 'Select End Date',
+    );
+
+    if (picked != null) {
+      setState(() {
+        selectedToDate = picked;
+      });
+    }
+  }
+
+  String _formatDateDisplay(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  String _formatDateApi(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _downloadCsv() async {
+    if (selectedFromDate == null || selectedToDate == null) {
+      Fluttertoast.showToast(
+        msg: "Please select both dates",
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+      return;
+    }
+
+    setState(() {
+      isDownloading = true;
+    });
+
+    try {
+      final fromDateStr = _formatDateApi(selectedFromDate!);
+      final toDateStr = _formatDateApi(selectedToDate!);
+      
+      final downloadUrl = ServerApi.getDownloadEventEntriesUrl(
+        widget.eventId,
+        fromDateStr,
+        toDateStr,
+      );
+
+      // Get JWT token from Supabase session
+      final session = Supabase.instance.client.auth.currentSession;
+      final token = session?.accessToken;
+      
+      if (token == null) {
+        throw Exception('Authentication token not found');
+      }
+
+      // Make HTTP request with JWT headers
+      final response = await http.get(
+        Uri.parse(downloadUrl),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        // Get downloads directory
+        Directory? directory;
+        if (Platform.isAndroid) {
+          directory = Directory('/storage/emulated/0/Download');
+          if (!await directory.exists()) {
+            directory = await getExternalStorageDirectory();
+          }
+        } else if (Platform.isIOS) {
+          directory = await getApplicationDocumentsDirectory();
+        } else {
+          directory = await getDownloadsDirectory();
+        }
+
+        if (directory == null) {
+          throw Exception('Could not access downloads directory');
+        }
+
+        // Generate filename with current date: guest_list_2025-10-12.csv
+        final now = DateTime.now();
+        final dateStr = DateFormat('yyyy-MM-dd').format(now);
+        final filename = 'guest_list_$dateStr.csv';
+        final filePath = '${directory.path}/$filename';
+
+        // Write file
+        final file = File(filePath);
+        await file.writeAsBytes(response.bodyBytes);
+
+        if (!mounted) return;
+        Navigator.pop(context);
+        
+        // Show share dialog
+        _showShareDialog(filePath, filename);
+      } else {
+        throw Exception('Download failed: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('Error downloading CSV: $e');
+      if (!mounted) return;
+      
+      Fluttertoast.showToast(
+        msg: "Download failed: ${e.toString()}",
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          isDownloading = false;
+        });
+      }
+    }
+  }
+
+  void _showShareDialog(String filePath, String filename) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green),
+            SizedBox(width: 8),
+            Text(
+              'Download Complete',
+              style: TextStyle(
+                color: Colors.green,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'File saved as:',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[700],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              filename,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1A237E),
+              ),
+            ),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, size: 18, color: Colors.blue[700]),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Share the file via WhatsApp, Email, etc.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.blue[700],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Close',
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              try {
+                final xFile = XFile(filePath);
+                await Share.shareXFiles(
+                  [xFile],
+                  text: 'Guest List CSV Export - ${filename}',
+                  subject: 'Guest List Data',
+                );
+              } catch (e) {
+                debugPrint('Error sharing file: $e');
+                Fluttertoast.showToast(
+                  msg: "Failed to share: ${e.toString()}",
+                  backgroundColor: Colors.red,
+                  textColor: Colors.white,
+                );
+              }
+            },
+            icon: Icon(Icons.share, size: 18),
+            label: Text('Share'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFF1A237E),
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Row(
+        children: [
+          Icon(Icons.download, color: Color(0xFF1A237E)),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Download Entry Data',
+              style: TextStyle(
+                color: Color(0xFF1A237E),
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Event: ${widget.eventName}',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey[700],
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Available range: ${_formatDateDisplay(widget.firstEntryDate)} - ${_formatDateDisplay(widget.lastEntryDate)}',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
+            ),
+            SizedBox(height: 20),
+            Text(
+              'Select Date Range:',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[800],
+              ),
+            ),
+            SizedBox(height: 12),
+            // From Date
+            InkWell(
+              onTap: isDownloading ? null : _selectFromDate,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey[300]!),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'From: ${selectedFromDate != null ? _formatDateDisplay(selectedFromDate!) : 'Select'}',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    Icon(Icons.calendar_today, size: 18, color: Color(0xFF1A237E)),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(height: 12),
+            // To Date
+            InkWell(
+              onTap: isDownloading ? null : _selectToDate,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey[300]!),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'To: ${selectedToDate != null ? _formatDateDisplay(selectedToDate!) : 'Select'}',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    Icon(Icons.calendar_today, size: 18, color: Color(0xFF1A237E)),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(height: 16),
+            Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, size: 18, color: Colors.blue[700]),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'CSV will include all entry records within selected dates',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.blue[700],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: isDownloading ? null : () => Navigator.pop(context),
+          child: Text(
+            'Cancel',
+            style: TextStyle(color: Colors.grey[600]),
+          ),
+        ),
+        ElevatedButton.icon(
+          onPressed: isDownloading ? null : _downloadCsv,
+          icon: isDownloading
+              ? SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : Icon(Icons.download, size: 18),
+          label: Text(isDownloading ? 'Downloading...' : 'Download CSV'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Color(0xFF1A237E),
+            foregroundColor: Colors.white,
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+        ),
+      ],
+    );
   }
 }

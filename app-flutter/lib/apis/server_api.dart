@@ -331,6 +331,33 @@ class ServerApi {
     return ServerEndpoints.downloadVisitorCard(jwtToken);
   }
 
+  /// Get entry date range for an event (Admin/Security)
+  static Future<Map<String, dynamic>?> getEventEntryDateRange(int eventId) async {
+    try {
+      final headers = await _buildHeaders();
+      final response = await http.get(
+        Uri.parse(ServerEndpoints.getEventEntryDateRange(eventId)),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data;
+      } else {
+        _handleError('getEventEntryDateRange', response.body);
+        return null;
+      }
+    } catch (e) {
+      _handleError('getEventEntryDateRange', e);
+      return null;
+    }
+  }
+
+  /// Get URL for downloading event entries CSV
+  static String getDownloadEventEntriesUrl(int eventId, String fromDate, String toDate) {
+    return ServerEndpoints.downloadEventEntries(eventId, fromDate, toDate);
+  }
+
   // ============================================================
   // USER MANAGEMENT APIS
   // ============================================================

@@ -16,8 +16,8 @@ void main() async {
  
   // Initialize Supabase with proper configuration
   await Supabase.initialize(
-    url: 'SUPABASE_URL',
-    anonKey: 'SUPABASE_ANON_KEY',
+    url: 'https://vtburcakebnumelvwlaa.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0YnVyY2FrZWJudW1lbHZ3bGFhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk3NDc4MjcsImV4cCI6MjA3NTMyMzgyN30.5vbiEoDD4Ytji44I8z2mSgOu-BDDrLmb4f_MGNIaz4s',
     authOptions: const FlutterAuthClientOptions(
       authFlowType: AuthFlowType.pkce,
       // Enable automatic token refresh

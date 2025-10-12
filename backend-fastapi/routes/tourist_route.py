@@ -1,7 +1,7 @@
 from fastapi import (
-    APIRouter, BackgroundTasks, Depends, HTTPException, status, UploadFile
+    APIRouter, BackgroundTasks, Depends, HTTPException, status, UploadFile, Query
 )
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from utils.supabase.auth import jwt_middleware, check_guard_admin_access
 from utils.supabase.supabase import supabaseAdmin
 from utils.models.api_models import Tourist
@@ -270,10 +270,17 @@ async def get_tourists_by_event(
     user=Depends(check_guard_admin_access)
 ):
     """
-    Fetch tourists for an event with their entry status
+    Fetch tourists for an event with ONLY TODAY'S entry status.
+    
+    Key behavior:
+    - Only shows current day (today's) entry information
+    - If tourist entered yesterday but didn't exit, they won't show as "inside"
+    - "Currently inside" means: entered TODAY and no departure recorded TODAY
+    - Old days data is completely ignored for the "inside" status
+    
     Returns clear separation between:
     - Total tourist registrations (records) vs Total members (actual people)
-    - Groups vs Individuals
+    - Groups vs Individuals  
     - Currently inside (both registration count and people count)
     """
     from datetime import date
@@ -304,7 +311,7 @@ async def get_tourists_by_event(
         .execute()
     )
     
-    # Calculate total statistics
+    # Calculate total statistics (STATIC - never changes)
     total_tourist_registrations = len(all_tourists_resp.data) if all_tourists_resp.data else 0
     total_group_registrations = sum(1 for t in all_tourists_resp.data if t.get("is_group", False)) if all_tourists_resp.data else 0
     total_individual_registrations = total_tourist_registrations - total_group_registrations
@@ -319,6 +326,77 @@ async def get_tourists_by_event(
             else:
                 total_members += 1
     
+    # ============================================================
+    # Calculate DYNAMIC statistics (currently inside, today's entries)
+    # These are calculated from ALL tourists, not just current page
+    # ============================================================
+    all_tourist_ids = [t["user_id"] for t in all_tourists_resp.data] if all_tourists_resp.data else []
+    
+    # Fetch TODAY's entry records for ALL tourists
+    all_entries_today_resp = (
+        supabaseAdmin.table("entry_records")
+        .select("*")
+        .in_("user_id", all_tourist_ids)
+        .eq("event_id", event_id)
+        .eq("entry_date", today)
+        .execute()
+    ) if all_tourist_ids else None
+    
+    # Map all entry records by user_id
+    all_entry_records_map = {}
+    if all_entries_today_resp and hasattr(all_entries_today_resp, 'data') and all_entries_today_resp.data:
+        for record in all_entries_today_resp.data:
+            all_entry_records_map[record["user_id"]] = record
+    
+    # Fetch entry_items for today's records
+    all_record_ids = [r["record_id"] for r in all_entry_records_map.values()]
+    all_entry_items_map = {}
+    
+    if all_record_ids:
+        all_items_resp = (
+            supabaseAdmin.table("entry_items")
+            .select("*")
+            .in_("record_id", all_record_ids)
+            .execute()
+        )
+        
+        if hasattr(all_items_resp, 'data') and all_items_resp.data:
+            for item in all_items_resp.data:
+                record_id = item["record_id"]
+                if record_id not in all_entry_items_map:
+                    all_entry_items_map[record_id] = []
+                all_entry_items_map[record_id].append(item)
+    
+    # Calculate DYNAMIC statistics from ALL tourists
+    currently_inside_registrations = 0
+    currently_inside_members = 0
+    with_entry_today_registrations = 0
+    with_entry_today_members = 0
+    
+    for tourist in all_tourists_resp.data:
+        user_id = tourist["user_id"]
+        entry_record = all_entry_records_map.get(user_id)
+        
+        is_group = tourist.get("is_group", False)
+        member_count = tourist.get("group_count", 1) if is_group else 1
+        
+        if entry_record:
+            record_id = entry_record["record_id"]
+            entry_items = all_entry_items_map.get(record_id, [])
+            
+            # Check if currently inside (has open entry)
+            open_entries = [item for item in entry_items if item.get("departure_time") is None]
+            is_currently_inside = len(open_entries) > 0
+            
+            # Update statistics
+            with_entry_today_registrations += 1
+            with_entry_today_members += member_count
+            
+            if is_currently_inside:
+                currently_inside_registrations += 1
+                currently_inside_members += member_count
+    
+    # ============================================================
     if not tourist_ids:
         return {
             "tourists": [],
@@ -340,70 +418,23 @@ async def get_tourists_by_event(
             }
         }
 
-    # Fetch TODAY's entry records for these tourists
-    entries_resp = (
-        supabaseAdmin.table("entry_records")
-        .select("*")
-        .in_("user_id", tourist_ids)
-        .eq("event_id", event_id)
-        .eq("entry_date", today)
-        .execute()
-    )
+    # ============================================================
+    # NOW enrich the CURRENT PAGE tourists with today's entry info
+    # Statistics are already calculated from ALL tourists above
+    # ============================================================
     
-    entry_records_map = {}
-    if hasattr(entries_resp, 'data') and entries_resp.data:
-        for record in entries_resp.data:
-            entry_records_map[record["user_id"]] = record
-    
-    # Fetch entry_items for today's records
-    record_ids = [r["record_id"] for r in entry_records_map.values()]
-    entry_items_map = {}
-    
-    if record_ids:
-        items_resp = (
-            supabaseAdmin.table("entry_items")
-            .select("*")
-            .in_("record_id", record_ids)
-            .order("arrival_time", desc=True)
-            .execute()
-        )
-        
-        if hasattr(items_resp, 'data') and items_resp.data:
-            for item in items_resp.data:
-                record_id = item["record_id"]
-                if record_id not in entry_items_map:
-                    entry_items_map[record_id] = []
-                entry_items_map[record_id].append(item)
-    
-    # Calculate statistics for currently inside and with entry today
-    currently_inside_registrations = 0
-    currently_inside_members = 0
-    with_entry_today_registrations = 0
-    with_entry_today_members = 0
-    
-    # Enrich tourist data with entry information
+    # Enrich tourist data with entry information for current page
     for tourist in resp.data:
         user_id = tourist["user_id"]
-        entry_record = entry_records_map.get(user_id)
-        
-        is_group = tourist.get("is_group", False)
-        member_count = tourist.get("group_count", 1) if is_group else 1
+        entry_record = all_entry_records_map.get(user_id)
         
         if entry_record:
             record_id = entry_record["record_id"]
-            entry_items = entry_items_map.get(record_id, [])
+            entry_items = all_entry_items_map.get(record_id, [])
             
             # Calculate active status (has entry without departure today)
             open_entries = [item for item in entry_items if item.get("departure_time") is None]
             is_currently_inside = len(open_entries) > 0
-            
-            # Update statistics
-            with_entry_today_registrations += 1
-            with_entry_today_members += member_count
-            
-            if is_currently_inside:
-                currently_inside_registrations += 1
-                currently_inside_members += member_count
             
             tourist["today_entry"] = {
                 "has_entry_today": True,
@@ -428,19 +459,19 @@ async def get_tourists_by_event(
     response_data  ={
         "tourists": resp.data,
         "statistics": {
-            # Total registrations (database records)
+            # STATIC - Total registrations (never changes, database records)
             "total_tourist_registrations": total_tourist_registrations,
             "total_individual_registrations": total_individual_registrations,
             "total_group_registrations": total_group_registrations,
             
-            # Total members (actual people count)
+            # STATIC - Total members (never changes, actual people count)
             "total_members": total_members,
             
-            # Currently inside (from current page data)
+            # DYNAMIC - Currently inside (updates based on TODAY's data only)
             "currently_inside_registrations": currently_inside_registrations,
             "currently_inside_members": currently_inside_members,
             
-            # With entry today (from current page data)
+            # DYNAMIC - With entry today (updates based on TODAY's data only)
             "with_entry_today_registrations": with_entry_today_registrations,
             "with_entry_today_members": with_entry_today_members
         },
@@ -759,3 +790,324 @@ async def download_visitor_card(token: str):
     except Exception as e:
         print(f"Error downloading visitor card: {e}")
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to download visitor card")
+
+
+# ------------------------------------------------------------
+# GET ENTRY DATE RANGE FOR AN EVENT
+# ------------------------------------------------------------
+@router.get("/event/{event_id}/entry-date-range", status_code=status.HTTP_200_OK)
+async def get_event_entry_date_range(
+    event_id: int,
+    user=Depends(check_guard_admin_access)
+):
+    """
+    Get the date range (first entry to last entry) for an event.
+    Useful for showing available date range before downloading data.
+    """
+    try:
+        # Get the earliest and latest entry dates for this event
+        entry_records_resp = (
+            supabaseAdmin.table("entry_records")
+            .select("entry_date")
+            .eq("event_id", event_id)
+            .order("entry_date", desc=False)
+            .limit(1)
+            .execute()
+        )
+        
+        latest_records_resp = (
+            supabaseAdmin.table("entry_records")
+            .select("entry_date")
+            .eq("event_id", event_id)
+            .order("entry_date", desc=True)
+            .limit(1)
+            .execute()
+        )
+        
+        first_entry_date = None
+        last_entry_date = None
+        
+        if entry_records_resp.data and len(entry_records_resp.data) > 0:
+            first_entry_date = entry_records_resp.data[0]["entry_date"]
+            
+        if latest_records_resp.data and len(latest_records_resp.data) > 0:
+            last_entry_date = latest_records_resp.data[0]["entry_date"]
+        
+        # Get event details
+        event_resp = supabaseAdmin.table("events").select("name, start_date, end_date").eq("event_id", event_id).single().execute()
+        
+        if hasattr(event_resp, 'error'):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Event not found")
+        
+        return {
+            "success": True,
+            "event": {
+                "event_id": event_id,
+                "name": event_resp.data.get("name"),
+                "event_start_date": str(event_resp.data.get("start_date", ""))[:10],
+                "event_end_date": str(event_resp.data.get("end_date", ""))[:10]
+            },
+            "entry_date_range": {
+                "first_entry_date": first_entry_date,
+                "last_entry_date": last_entry_date,
+                "has_entries": first_entry_date is not None
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting entry date range: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get entry date range: {str(e)}"
+        )
+
+
+# ------------------------------------------------------------
+# DOWNLOAD ENTRY DATA FOR DATE RANGE (CSV)
+# ------------------------------------------------------------
+@router.get("/event/{event_id}/download-entries", status_code=status.HTTP_200_OK)
+async def download_event_entries(
+    event_id: int,
+    from_date: str = Query(..., description="Start date (YYYY-MM-DD format)"),
+    to_date: str = Query(..., description="End date (YYYY-MM-DD format)"),
+    user=Depends(check_guard_admin_access)
+):
+    """
+    Download all entry records for an event within a specific date range.
+    
+    Returns a CSV file with the following columns:
+    - Entry Date
+    - Tourist Name
+    - Email
+    - Unique ID Type
+    - Unique ID
+    - Is Group
+    - Group Count
+    - Arrival Time
+    - Departure Time
+    - Duration
+    - Entry Type
+    - Entry Point
+    - Status (Inside/Exited)
+    
+    Query Parameters:
+    - from_date: Start date in YYYY-MM-DD format
+    - to_date: End date in YYYY-MM-DD format
+    """
+    try:
+        from datetime import datetime
+        import csv
+        import io
+        from fastapi.responses import StreamingResponse
+        
+        # Validate dates
+        try:
+            from_date_obj = datetime.strptime(from_date, "%Y-%m-%d").date()
+            to_date_obj = datetime.strptime(to_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid date format. Use YYYY-MM-DD format."
+            )
+        
+        if from_date_obj > to_date_obj:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="from_date cannot be after to_date"
+            )
+        
+        # Get event details
+        event_resp = supabaseAdmin.table("events").select("name").eq("event_id", event_id).single().execute()
+        if hasattr(event_resp, 'error'):
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Event not found")
+        
+        event_name = event_resp.data.get("name", f"Event_{event_id}")
+        
+        # Fetch all entry records within the date range
+        entry_records_resp = (
+            supabaseAdmin.table("entry_records")
+            .select("*")
+            .eq("event_id", event_id)
+            .gte("entry_date", from_date)
+            .lte("entry_date", to_date)
+            .order("entry_date", desc=False)
+            .execute()
+        )
+        
+        if not entry_records_resp.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No entry records found for the specified date range"
+            )
+        
+        # Get all user IDs
+        user_ids = list(set([record["user_id"] for record in entry_records_resp.data]))
+        
+        # Fetch tourist details
+        tourists_resp = (
+            supabaseAdmin.table("tourists")
+            .select("*")
+            .in_("user_id", user_ids)
+            .execute()
+        )
+        
+        tourists_map = {t["user_id"]: t for t in tourists_resp.data} if tourists_resp.data else {}
+        
+        # Fetch all entry items for these records
+        record_ids = [record["record_id"] for record in entry_records_resp.data]
+        entry_items_resp = (
+            supabaseAdmin.table("entry_items")
+            .select("*")
+            .in_("record_id", record_ids)
+            .order("arrival_time", desc=False)
+            .execute()
+        )
+        
+        # Fetch verifier (security/admin) information
+        # Get unique verifier IDs from entry_items
+        verifier_ids = []
+        if entry_items_resp.data:
+            verifier_ids = list(set([
+                item.get("verified_by") 
+                for item in entry_items_resp.data 
+                if item.get("verified_by")
+            ]))
+        
+        # Fetch verifier details from users table (or auth.users)
+        verifiers_map = {}
+        if verifier_ids:
+            try:
+                # Fetch from Supabase auth users
+                for verifier_id in verifier_ids:
+                    try:
+                        # Get user from auth
+                        user_resp = supabaseAdmin.auth.admin.get_user_by_id(verifier_id)
+                        if user_resp and user_resp.user:
+                            verifiers_map[verifier_id] = {
+                                "name": user_resp.user.user_metadata.get("name", "Unknown"),
+                                "email": user_resp.user.email or "No Email"
+                            }
+                    except:
+                        verifiers_map[verifier_id] = {
+                            "name": "Unknown",
+                            "email": "N/A"
+                        }
+            except Exception as e:
+                print(f"Error fetching verifiers: {e}")
+        
+        # Create CSV in memory
+        output = io.StringIO()
+        csv_writer = csv.writer(output)
+        
+        # Write header (removed IDs and bypass_reason, added verifier info)
+        csv_writer.writerow([
+            "Entry Date",
+            "Tourist Name",
+            "Email",
+            "Unique ID Type",
+            "Unique ID",
+            "Is Group",
+            "Group Count",
+            "Total Members",
+            "Arrival Time",
+            "Departure Time",
+            "Duration (minutes)",
+            "Entry Type",
+            "Entry Point",
+            "Status",
+            "Verified By Name",
+            "Verified By Email"
+        ])
+        
+        # Write data rows
+        for entry_item in entry_items_resp.data if entry_items_resp.data else []:
+            record_id = entry_item["record_id"]
+            
+            # Find the entry record
+            entry_record = next((r for r in entry_records_resp.data if r["record_id"] == record_id), None)
+            if not entry_record:
+                continue
+            
+            # Get tourist details
+            tourist = tourists_map.get(entry_record["user_id"], {})
+            
+            # Calculate duration in minutes
+            duration_minutes = ""
+            if entry_item.get("duration"):
+                try:
+                    # duration is in format like "1 days 00:30:00" or "00:30:00"
+                    duration_str = str(entry_item["duration"])
+                    # Simple parsing - this can be improved
+                    if "days" in duration_str:
+                        parts = duration_str.split()
+                        days = int(parts[0])
+                        time_part = parts[2]
+                    else:
+                        days = 0
+                        time_part = duration_str
+                    
+                    time_parts = time_part.split(":")
+                    hours = int(time_parts[0])
+                    minutes = int(time_parts[1])
+                    
+                    total_minutes = (days * 24 * 60) + (hours * 60) + minutes
+                    duration_minutes = str(total_minutes)
+                except:
+                    duration_minutes = "N/A"
+            
+            # Determine status
+            status = "Exited" if entry_item.get("departure_time") else "Inside"
+            
+            # Calculate total members
+            is_group = tourist.get("is_group", False)
+            group_count = tourist.get("group_count", 1)
+            total_members = group_count if is_group else 1
+            
+            # Get verifier information
+            verifier_id = entry_item.get("verified_by")
+            verifier_info = verifiers_map.get(verifier_id, {"name": "N/A", "email": "N/A"})
+            
+            csv_writer.writerow([
+                entry_record.get("entry_date", ""),
+                tourist.get("name", ""),
+                tourist.get("email", ""),
+                tourist.get("unique_id_type", ""),
+                tourist.get("unique_id", ""),
+                "Yes" if is_group else "No",
+                group_count,
+                total_members,
+                entry_item.get("arrival_time", ""),
+                entry_item.get("departure_time", "") or "Still Inside",
+                duration_minutes or "N/A",
+                entry_item.get("entry_type", ""),
+                entry_item.get("entry_point", ""),
+                status,
+                verifier_info["name"],
+                verifier_info["email"]
+            ])
+        
+        # Prepare the response
+        output.seek(0)
+        filename = f"{event_name.replace(' ', '_')}_entries_{from_date}_to_{to_date}.csv"
+        
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}",
+                "Access-Control-Allow-Origin": "*"
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error downloading entries: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to download entries: {str(e)}"
+        )

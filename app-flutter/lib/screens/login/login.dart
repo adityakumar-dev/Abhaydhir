@@ -3,6 +3,9 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:provider/provider.dart';
+import 'package:spring_admin/providers/event_provider.dart';
+import 'package:spring_admin/screens/home/home.dart';
 import 'package:spring_admin/screens/register/register_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -31,6 +34,10 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (!mounted) return;
+      final eventProvider = Provider.of<EventProvider>(context, listen: false);
+      eventProvider.clearSelection();
+      await eventProvider.initialize();
+      Navigator.pushNamed(context, HomeScreen.routeName);
 
       // Show success message (navigation handled by auth state listener)
       await Fluttertoast.showToast(

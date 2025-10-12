@@ -28,6 +28,9 @@ class EventProvider extends ChangeNotifier {
   /// Initialize provider - fetch events and load saved selection
   /// Call this once at app startup
   Future<void> initialize() async {
+    ServerApi.logger.i('Initializing EventProvider');
+    ServerApi.logger.i('Current status : ${_initialized}');
+    
     if (_initialized) return;
 
     _isLoading = true;

@@ -68,6 +68,14 @@ async def get_event_security_analytics(
             "individuals_inside": 0
         }
         
+        # Ensure all values are integers, not None
+        crowd_data = {
+            "total_inside": crowd_data.get("total_inside") or 0,
+            "total_people_inside": crowd_data.get("total_people_inside") or 0,
+            "groups_inside": crowd_data.get("groups_inside") or 0,
+            "individuals_inside": crowd_data.get("individuals_inside") or 0
+        }
+        
         # ============================================================
         # 2. LAST HOUR ENTRY STATISTICS
         # ============================================================
@@ -95,6 +103,16 @@ async def get_event_security_analytics(
             "avg_processing_seconds": 0
         }
         
+        # Ensure all values are not None
+        last_hour_data = {
+            "entries_last_hour": last_hour_data.get("entries_last_hour") or 0,
+            "unique_visitors_last_hour": last_hour_data.get("unique_visitors_last_hour") or 0,
+            "normal_entries": last_hour_data.get("normal_entries") or 0,
+            "bypass_entries": last_hour_data.get("bypass_entries") or 0,
+            "manual_entries": last_hour_data.get("manual_entries") or 0,
+            "avg_processing_seconds": last_hour_data.get("avg_processing_seconds") or 0
+        }
+        
         # ============================================================
         # 3. TODAY'S COMPLETE SUMMARY
         # ============================================================
@@ -115,6 +133,17 @@ async def get_event_security_analytics(
         """
         today_results = await execute_raw_sql(today_summary_query)
         today_data = today_results[0] if today_results else {}
+        
+        # Ensure all values are not None
+        today_data = {
+            "total_unique_visitors": today_data.get("total_unique_visitors") or 0,
+            "total_entries": today_data.get("total_entries") or 0,
+            "total_people_count": today_data.get("total_people_count") or 0,
+            "total_groups": today_data.get("total_groups") or 0,
+            "total_individuals": today_data.get("total_individuals") or 0,
+            "exited_visitors": today_data.get("exited_visitors") or 0,
+            "avg_visit_duration_seconds": today_data.get("avg_visit_duration_seconds") or 0
+        }
         
         # ============================================================
         # 4. ENTRY TYPE BREAKDOWN (Today)
@@ -176,6 +205,14 @@ async def get_event_security_analytics(
             "median_scan_seconds": 0
         }
         
+        # Ensure all values are not None
+        scanning_data = {
+            "avg_scan_seconds": scanning_data.get("avg_scan_seconds") or 0,
+            "min_scan_seconds": scanning_data.get("min_scan_seconds") or 0,
+            "max_scan_seconds": scanning_data.get("max_scan_seconds") or 0,
+            "median_scan_seconds": scanning_data.get("median_scan_seconds") or 0
+        }
+        
         # ============================================================
         # 7. RECENT ENTRIES (Last 10)
         # ============================================================
@@ -204,8 +241,11 @@ async def get_event_security_analytics(
         capacity_percentage = 0
         capacity_status = "unknown"
         if event_data.get('max_capacity'):
+            total_people_inside = crowd_data.get('total_people_inside') or 0
+            max_capacity = event_data.get('max_capacity') or 1  # Avoid division by zero
+            
             capacity_percentage = round(
-                (crowd_data['total_people_inside'] / event_data['max_capacity']) * 100, 
+                (total_people_inside / max_capacity) * 100, 
                 2
             )
             if capacity_percentage >= 90:
@@ -238,12 +278,12 @@ async def get_event_security_analytics(
                 "capacity_status": capacity_status
             },
             "last_hour": {
-                "entries": last_hour_data['entries_last_hour'],
-                "unique_visitors": last_hour_data['unique_visitors_last_hour'],
-                "entry_rate_per_minute": round(last_hour_data['entries_last_hour'] / 60, 2),
-                "normal_entries": last_hour_data['normal_entries'],
-                "bypass_entries": last_hour_data['bypass_entries'],
-                "manual_entries": last_hour_data['manual_entries'],
+                "entries": last_hour_data.get('entries_last_hour', 0),
+                "unique_visitors": last_hour_data.get('unique_visitors_last_hour', 0),
+                "entry_rate_per_minute": round((last_hour_data.get('entries_last_hour') or 0) / 60, 2),
+                "normal_entries": last_hour_data.get('normal_entries', 0),
+                "bypass_entries": last_hour_data.get('bypass_entries', 0),
+                "manual_entries": last_hour_data.get('manual_entries', 0),
                 "avg_processing_time_seconds": round(last_hour_data.get('avg_processing_seconds', 0) or 0, 2)
             },
             "today_summary": {
@@ -253,7 +293,7 @@ async def get_event_security_analytics(
                 "total_groups": today_data.get('total_groups', 0),
                 "total_individuals": today_data.get('total_individuals', 0),
                 "exited_visitors": today_data.get('exited_visitors', 0),
-                "avg_visit_duration_minutes": round((today_data.get('avg_visit_duration_seconds', 0) or 0) / 60, 2)
+                "avg_visit_duration_minutes": round((today_data.get('avg_visit_duration_seconds') or 0) / 60, 2)
             },
             "entry_types": entry_types,
             "hourly_distribution": hourly_data,
@@ -387,16 +427,20 @@ async def get_security_alerts(
         crowd_results = await execute_raw_sql(crowd_query)
         crowd_data = crowd_results[0] if crowd_results else {"total_people_inside": 0}
         
+        # Ensure values are not None
+        total_people_inside = crowd_data.get('total_people_inside') or 0
+        
         # Alert 1: Capacity Warning
         if event_data.get('max_capacity'):
-            capacity_percentage = (crowd_data['total_people_inside'] / event_data['max_capacity']) * 100
+            max_capacity = event_data.get('max_capacity') or 1  # Avoid division by zero
+            capacity_percentage = (total_people_inside / max_capacity) * 100
             if capacity_percentage >= 90:
                 alerts.append({
                     "type": "capacity_critical",
                     "severity": "critical",
                     "message": f"Capacity at {round(capacity_percentage, 1)}% - Critical level",
                     "data": {
-                        "current": crowd_data['total_people_inside'],
+                        "current": total_people_inside,
                         "max": event_data['max_capacity'],
                         "percentage": round(capacity_percentage, 2)
                     }
@@ -407,7 +451,7 @@ async def get_security_alerts(
                     "severity": "warning",
                     "message": f"Capacity at {round(capacity_percentage, 1)}% - High level",
                     "data": {
-                        "current": crowd_data['total_people_inside'],
+                        "current": total_people_inside,
                         "max": event_data['max_capacity'],
                         "percentage": round(capacity_percentage, 2)
                     }
@@ -424,7 +468,7 @@ async def get_security_alerts(
             AND ei.arrival_time >= NOW() - INTERVAL '1 hour'
         """
         bypass_results = await execute_raw_sql(bypass_query)
-        bypass_count = bypass_results[0]['bypass_count'] if bypass_results else 0
+        bypass_count = (bypass_results[0].get('bypass_count') or 0) if bypass_results else 0
         
         if bypass_count > 10:  # More than 10 bypasses in last hour
             alerts.append({

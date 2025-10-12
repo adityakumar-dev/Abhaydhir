@@ -1,6 +1,9 @@
 class ServerEndpoints {
-  // Base URL - Update this for production
-  static String baseUrl = 'https://enabled-flowing-bedbug.ngrok-free.app';
+  // Base URL - for testing
+  // static String baseUrl = 'https://enabled-flowing-bedbug.ngrok-free.app';
+  // Base URL - for production 
+  static String baseUrl = 'https://api.vmsbutu.it.com';
+  
 
   // ============================================================
   // EVENT ENDPOINTS
@@ -51,6 +54,13 @@ class ServerEndpoints {
   
   // Download visitor card with JWT token (Public)
   static String downloadVisitorCard(String jwtToken) => '$baseUrl/tourists/download-visitor-card/$jwtToken';
+  
+  // Get entry date range for event (Admin/Security)
+  static String getEventEntryDateRange(int eventId) => '$baseUrl/tourists/event/$eventId/entry-date-range';
+  
+  // Download entry data CSV (Admin/Security)
+  static String downloadEventEntries(int eventId, String fromDate, String toDate) => 
+      '$baseUrl/tourists/event/$eventId/download-entries?from_date=$fromDate&to_date=$toDate';
 
   // ============================================================
   // USER MANAGEMENT ENDPOINTS

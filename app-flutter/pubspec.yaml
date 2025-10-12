@@ -57,6 +57,7 @@ dependencies:
   supabase_flutter: ^2.10.2
   qr_flutter: ^4.1.0
   logger: ^2.6.2
+  share_plus: ^10.1.3
 
 dev_dependencies:
   flutter_test:

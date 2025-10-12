@@ -1,0 +1,54 @@
+name: 🚀 Auto Deploy FastAPI + Next.js
+
+on:
+  push:
+    branches:
+      - main  # Trigger deployment on main branch push
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout the code from GitHub
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      # 2️⃣ Copy the entire repo to VPS
+      - name: Copy Code to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "."
+          target: "/root/utu/Abhaydhir"
+
+      # 3️⃣ SSH into VPS and run deployment commands
+      - name: Run Commands on VPS
+        uses: appleboy/ssh-action@v0.1.8
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            echo "🔄 Navigate to project folder..."
+            cd /root/utu/Abhaydhir
+
+            echo "🔄 Pull latest code..."
+            git pull origin main || true
+
+            echo "🐍 Backend setup (system Python)..."
+            cd backend-fastapi
+            # No venv, assume system Python and dependencies are already installed
+            # If you need to manually install dependencies, handle outside CI/CD
+
+            echo "🧱 Building Next.js frontend..."
+            cd ../web-next
+            npm install
+            npm run build
+
+            echo "♻️ Restarting FastAPI backend..."
+            sudo systemctl restart fastapi || true
+
+            echo "✅ Deployment completed successfully!"

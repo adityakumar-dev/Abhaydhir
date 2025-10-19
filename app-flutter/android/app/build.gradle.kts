@@ -1,23 +1,28 @@
 import java.util.Properties
 
+// ✅ Load key.properties
 val keystoreProperties = Properties().apply {
     val keystorePropertiesFile = rootProject.file("key.properties")
     if (keystorePropertiesFile.exists()) {
         keystorePropertiesFile.inputStream().use { this.load(it) }
     }
 }
+dependencies {
+    // Play Core libraries removed due to incompatibility with targetSdk 34+
+    // If you need Play Integrity:
+    // implementation("com.google.android.play:integrity:1.3.0")
+    // If you need Play Feature Delivery:
+    // implementation("com.google.android.play:feature-delivery:2.0.0")
+}
+
 plugins {
     id("com.android.application")
-    // START: FlutterFire Configuration
-    // id("com.google.gms.google-services")
-    // END: FlutterFire Configuration
     id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
-    namespace = "com.vmsbutu.abhayadhir"
+    namespace = "com.utu.abhayadhir"
     compileSdk = 35
     ndkVersion = "27.0.12077973"
 
@@ -31,17 +36,35 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.vmsbutu.abhayadhir"
+        applicationId = "com.utu.abhayadhir"
         minSdk = 21
         targetSdk = 35
-        versionCode = 4
-        versionName = "1.3"
+        versionCode = 1
+        versionName = "1.0"
+    }
+
+    // ✅ Add signing config for release
+    signingConfigs {
+        create("release") {
+            keyAlias = keystoreProperties["keyAlias"]?.toString()
+            keyPassword = keystoreProperties["keyPassword"]?.toString()
+            storeFile = keystoreProperties["storeFile"]?.toString()?.let { file(it) }
+            storePassword = keystoreProperties["storePassword"]?.toString()
+        }
     }
 
     buildTypes {
-        release {
-            isShrinkResources = false
-            isMinifyEnabled = false
+            getByName("release") {
+                isShrinkResources = true
+                isMinifyEnabled = true
+                proguardFiles(
+                    getDefaultProguardFile("proguard-android.txt"),
+                    "proguard-rules.pro"
+                )
+                signingConfig = signingConfigs.getByName("release")
+            }
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }

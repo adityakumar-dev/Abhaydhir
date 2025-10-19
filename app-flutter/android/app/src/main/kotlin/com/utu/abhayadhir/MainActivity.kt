@@ -1,4 +1,4 @@
-package com.vmsbutu.abhayadhir;
+package com.utu.abhayadhir;
 
 import io.flutter.embedding.android.FlutterActivity
 

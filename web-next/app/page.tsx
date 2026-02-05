@@ -29,9 +29,8 @@ export default function LandingPage() {
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center space-x-8">
               {/* <Link href="/about" className="text-white hover:text-amber-100 transition-colors font-medium">About</Link> */}
-              <Link href="/features" className="text-white hover:text-amber-100 transition-colors font-medium">Features</Link>
               <Link href="/vasontutsav2025" className="text-white hover:text-amber-100 transition-colors font-medium">Past Events</Link>
-              <Link href="/register/14" className="bg-white text-amber-700 px-6 py-2 rounded-full hover:bg-amber-50 transition font-semibold">Register</Link>
+              <Link href="/register/19" className="bg-white text-amber-700 px-6 py-2 rounded-full hover:bg-amber-50 transition font-semibold">Register</Link>
               <Link href="/abhaydhir" className="text-white hover:text-amber-100 transition-colors font-medium">App</Link>
             </div>
 

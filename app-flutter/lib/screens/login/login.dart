@@ -196,37 +196,35 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Spacer(flex: 2),
+
                     // Logo
-                     Column(
-                      children: [
-                        Image.asset(
-                          'assets/images/emblem.png',
-                          height: 120,
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          'SPRING FESTIVAL 2025',
-                          style: TextStyle(
-                            fontSize: 20,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          "राजभवन उत्तराखंड",
-                          style: TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.w600),
-                        ),
-                        Text(
-                          "RAJ BHAWAN UTTARKHAND",
-                          style: TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-                    ),
+                    //  Column(
+                    //   children: [
+                    //      Text(
+                    //       'SPRING FESTIVAL 2026',
+                    //       style: TextStyle(
+                    //         fontSize: 20,
+                    //       ),
+                    //     ),
+                    //     const SizedBox(height: 10),
+                    //     // Text(
+                    //     //   "राजभवन उत्तराखंड",
+                    //     //   style: TextStyle(
+                    //     //       fontSize: 20, fontWeight: FontWeight.w600),
+                    //     // ),
+                    //     // Text(
+                    //     //   "RAJ BHAWAN UTTARKHAND",
+                    //     //   style: TextStyle(
+                    //     //       fontSize: 20, fontWeight: FontWeight.w600),
+                    //     // ),
+                    //     // const SizedBox(height: 20),
+                    //   ],
+                    // ),
+                                        Spacer(flex: 3,)
+,
                     Text("Login with your credentials", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),),
                     const SizedBox(height: 10),
+                    
                     AppUserLogin(),
                     const SizedBox(height: 10),
                     Row(
@@ -238,8 +236,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         }, child: Text("Register", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.blue),)),
                       ],
                     ),
-                    const Spacer(flex: 2),
-                    // Powered by text
+                    // P
+                    //owered by text
+                    Spacer(flex: 1  ,),
                     Column(
                       children: [
                         Text(
@@ -251,6 +250,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                     const SizedBox(height: 10),
+                    Spacer(flex: 1,)
                   ],
                 ),
               ),

@@ -26,10 +26,10 @@ export default function Navbar() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            <Link href="/about" className="text-white hover:text-yellow-400 transition-colors">About</Link>
+            {/* <Link href="/about" className="text-white hover:text-yellow-400 transition-colors">About</Link> */}
             <Link href="/features" className="text-white hover:text-yellow-400 transition-colors">Features</Link>
             <Link href="/vasontutsav2025" className="text-white hover:text-yellow-400 transition-colors">Past Events</Link>
-            <Link href="/register" className="text-white hover:text-yellow-400 transition-colors">Registration</Link>
+            <Link href="/register/14" className="text-white hover:text-yellow-400 transition-colors">Registration</Link>
             <Link href="/abhaydhir" className="text-white hover:text-yellow-400 transition-colors">Abhaydhir App</Link>
           </div>
 

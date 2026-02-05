@@ -2,212 +2,201 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { LoadingBar } from "@/components/loading-bar"
 
 export default function LandingPage() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [imagesLoaded, setImagesLoaded] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  
-  const images = [
-    '/images/spring_festival/image1.jpg',
-    '/images/spring_festival/image2.jpg',
-    '/images/spring_festival/image3.jpg',
-    '/images/spring_festival/image4.jpg',
-  ];
-
-  useEffect(() => {
-    const loadImages = async () => {
-      const imagePromises = images.map((src) => {
-        return new Promise((resolve, reject) => {
-          const img = new window.Image();
-          img.src = src;
-          img.onload = resolve;
-          img.onerror = reject;
-        });
-      });
-
-      try {
-        await Promise.all(imagePromises);
-        setImagesLoaded(true);
-      } catch (error) {
-        console.error('Error loading images:', error);
-      }
-    };
-
-    loadImages();
-  }, []);
-
-  useEffect(() => {
-    if (imagesLoaded) {
-      setIsLoading(false);
-    }
-  }, [imagesLoaded]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentImageIndex((prevIndex) =>
-        prevIndex === images.length - 1 ? 0 : prevIndex + 1
-      );
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  if (isLoading) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-white">
-        <div className="flex flex-col items-center">
-          <div className="w-16 h-16 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="mt-4 text-lg font-semibold text-gray-700">Loading Raj Bhawan...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-100 to-white">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-green-50">
       <LoadingBar />
-      <header className="w-full relative bg-cover bg-center h-screen">
-          <div
-            className="absolute inset-0 w-full h-full transition-opacity duration-1000 ease-in-out"
-            style={{
-              backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('/images/rajhbhawan.jpg')`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-            }}
-          />
-        
-        
-        {/* New Modern Navigation Bar */}
-        <nav className="bg-black/30 backdrop-blur-md shadow-lg sticky top-0 z-50">
-          <div className="container mx-auto px-4 py-3">
-            <div className="flex items-center justify-between">
-              {/* Logo - Made more compact for mobile */}
-              <div className="flex items-center space-x-2">
-                <Image src="/images/emblem_white.svg" alt="Logo" width={40} height={40} 
-                  className="w-8 h-8 md:w-10 md:h-10 brightness-0 invert" />
-                <div className="flex flex-col">
-                  <p className="text-xs md:text-sm text-white">राजभवन उत्तराखंड</p>
-                  <h1 className="text-sm md:text-lg text-white font-bold">RAJBHAWAN UTTARAKHAND</h1>
-                  <p className="text-[10px] md:text-xs text-yellow-400">Visitor & Entry Management System</p>
-                </div>
+      
+      {/* Navigation Bar */}
+      <nav className="bg-gradient-to-r from-amber-700 to-orange-700 backdrop-blur-md shadow-lg sticky top-0 z-50">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            {/* Logo */}
+            <div className="flex items-center space-x-2">
+              {/* <Image src="/images/emblem_white.svg" alt="Logo" width={40} height={40} 
+                className="w-8 h-8 md:w-10 md:h-10" /> */}
+              <div className="flex flex-col">
+                <p className="text-xs md:text-sm text-white font-medium">Visitor & Entry</p>
+                <h1 className="text-sm md:text-lg text-white font-bold">Management System</h1>
               </div>
-
-              {/* Desktop Navigation */}
-              <div className="hidden md:flex items-center space-x-8">
-                <Link href="/about" className="text-white hover:text-yellow-400 transition-colors">About</Link>
-                <Link href="/features" className="text-white hover:text-yellow-400 transition-colors">Features</Link>
-                <Link href="/vasontutsav2025" className="text-white hover:text-yellow-400 transition-colors">Past Events</Link>
-                <Link href="/register/14" className="text-white hover:text-yellow-400 transition-colors">Registration</Link>
-                <Link href="/abhaydhir" className="text-white hover:text-yellow-400 transition-colors">Abhaydhir App</Link>
-              </div>
-
-              {/* Mobile Menu Button */}
-              <button 
-                className="md:hidden text-white p-2 focus:outline-none"
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              >
-                {mobileMenuOpen ? (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                ) : (
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                  </svg>
-                )}
-              </button>
             </div>
 
-            {/* Mobile Navigation - Slide down menu */}
-            {mobileMenuOpen && (
-              <div className="md:hidden mt-4 pb-4 border-t border-white/20">
-                <div className="flex flex-col space-y-3 pt-3">
-                  <Link 
-                    href="/about" 
-                    className="text-white hover:text-yellow-400 transition-colors px-2 py-2 rounded-lg hover:bg-white/10"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    About
-                  </Link>
-                  <Link 
-                    href="/features" 
-                    className="text-white hover:text-yellow-400 transition-colors px-2 py-2 rounded-lg hover:bg-white/10"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Features
-                  </Link>
-                  <Link 
-                    href="/vasontutsav2025" 
-                    className="text-white hover:text-yellow-400 transition-colors px-2 py-2 rounded-lg hover:bg-white/10"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Past Events
-                  </Link>
-                  <Link 
-                    href="/register" 
-                    className="text-white hover:text-yellow-400 transition-colors px-2 py-2 rounded-lg hover:bg-white/10"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Registration
-                  </Link>
-                  <Link 
-                    href="/abhaydhir" 
-                    className="text-white hover:text-yellow-400 transition-colors px-2 py-2 rounded-lg hover:bg-white/10"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Abhaydhir App
-                  </Link>
-                </div>
-              </div>
-            )}
-          </div>
-        </nav>
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center space-x-8">
+              {/* <Link href="/about" className="text-white hover:text-amber-100 transition-colors font-medium">About</Link> */}
+              <Link href="/features" className="text-white hover:text-amber-100 transition-colors font-medium">Features</Link>
+              <Link href="/vasontutsav2025" className="text-white hover:text-amber-100 transition-colors font-medium">Past Events</Link>
+              <Link href="/register/14" className="bg-white text-amber-700 px-6 py-2 rounded-full hover:bg-amber-50 transition font-semibold">Register</Link>
+              <Link href="/abhaydhir" className="text-white hover:text-amber-100 transition-colors font-medium">App</Link>
+            </div>
 
-        {/* Hero Content - Improved mobile responsiveness */}
-        <div className="flex flex-col items-center justify-center h-[calc(100vh-80px)] px-4">
-          <div className="container mx-auto px-4 text-center relative z-10">
-            <h1 className="text-3xl md:text-7xl font-bold mb-3 md:mb-4 text-white animate-fade-in-down leading-tight">
-              RAJ BHAWAN UTTARAKHAND
-            </h1>
-            <h2 className="text-xl md:text-6xl mb-4 md:mb-6 text-white animate-fade-in-down leading-tight">
-              VISITOR & ENTRY MANAGEMENT SYSTEM
+            {/* Mobile Menu Button */}
+            <button 
+              className="md:hidden text-white p-2 focus:outline-none"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              )}
+            </button>
+          </div>
+
+          {/* Mobile Navigation */}
+          {mobileMenuOpen && (
+            <div className="md:hidden mt-4 pb-4 border-t border-white/20">
+              <div className="flex flex-col space-y-3 pt-3">
+                {/* <Link href="/about" className="text-white hover:text-amber-100 transition-colors px-2 py-2" onClick={() => setMobileMenuOpen(false)}>About</Link> */}
+                <Link href="/features" className="text-white hover:text-amber-100 transition-colors px-2 py-2" onClick={() => setMobileMenuOpen(false)}>Features</Link>
+                <Link href="/vasontutsav2025" className="text-white hover:text-amber-100 transition-colors px-2 py-2" onClick={() => setMobileMenuOpen(false)}>Past Events</Link>
+                <Link href="/register/14" className="text-white hover:text-amber-100 transition-colors px-2 py-2" onClick={() => setMobileMenuOpen(false)}>Register</Link>
+                <Link href="/abhaydhir" className="text-white hover:text-amber-100 transition-colors px-2 py-2" onClick={() => setMobileMenuOpen(false)}>App</Link>
+              </div>
+            </div>
+          )}
+        </div>
+      </nav>
+
+      {/* Hero Section */}
+      <header className="relative h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-amber-50 via-white to-green-50">
+        {/* Floral Background Elements */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute top-10 left-5 w-32 h-32 opacity-10 animate-pulse">
+            <svg viewBox="0 0 100 100" className="w-full h-full text-amber-600">
+              <circle cx="50" cy="50" r="30" fill="currentColor" opacity="0.3"/>
+              <circle cx="30" cy="30" r="15" fill="currentColor" opacity="0.5"/>
+              <circle cx="70" cy="30" r="15" fill="currentColor" opacity="0.5"/>
+              <circle cx="30" cy="70" r="15" fill="currentColor" opacity="0.5"/>
+              <circle cx="70" cy="70" r="15" fill="currentColor" opacity="0.5"/>
+            </svg>
+          </div>
+          <div className="absolute bottom-20 right-10 w-40 h-40 opacity-10 animate-pulse" style={{animationDelay: '1s'}}>
+            <svg viewBox="0 0 100 100" className="w-full h-full text-green-600">
+              <circle cx="50" cy="50" r="30" fill="currentColor" opacity="0.3"/>
+              <circle cx="35" cy="35" r="12" fill="currentColor" opacity="0.5"/>
+              <circle cx="65" cy="35" r="12" fill="currentColor" opacity="0.5"/>
+              <circle cx="50" cy="65" r="12" fill="currentColor" opacity="0.5"/>
+            </svg>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="container mx-auto px-4 text-center relative z-10">
+          <div className="mb-8">
+            <h2 className="text-5xl md:text-7xl font-bold text-amber-900 mb-4 leading-tight">
+              Visitor & Entry Management System
             </h2>
-            <p className="text-base md:text-xl mb-6 md:mb-8 text-gray-200 animate-fade-in-up max-w-3xl mx-auto">
-              Experience the vibrant celebration of culture, tradition, and joy at the most prestigious event of Uttarakhand
-            </p>
-            <div className="flex flex-col md:flex-row items-center justify-center gap-4">
-              <Link
-                href="/register/14"
-                className="bg-transparent border-2 border-white text-white px-6 md:px-12 py-2.5 md:py-4 rounded-full text-base md:text-xl hover:bg-white/10 transition duration-300 w-full md:w-auto"
-              >
-                Register
-              </Link>
+            <h3 className="text-3xl md:text-5xl font-semibold text-green-700 mb-6">
+              Inspired by <span className="font-semibold text-amber-700">Governor Sir</span> and developed under the Hon'ble Vice-Chancellor of <span className="font-semibold text-green-700">Veer Madho Singh Bhandari Uttarakhand Technical University</span>
+            </h3>
+         
+          </div>
+
+          {/* CTA Button */}
+          <Link
+            href="/register/14"
+            className="inline-block bg-gradient-to-r from-amber-600 to-orange-600 text-white px-8 md:px-12 py-3 md:py-4 rounded-full text-lg font-semibold hover:shadow-xl transition-all duration-300 hover:scale-105"
+          >
+            Register →
+          </Link>
+        </div>
+      </header>
+      {/* Vision Section with VC Image */}
+      <section className="py-20 bg-white">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+            {/* Left - Text */}
+            <div>
+              <h2 className="text-4xl font-bold text-amber-900 mb-6">Our Vision</h2>
+              <p className="text-lg text-gray-700 mb-4 leading-relaxed">
+                Inspired by the Governor's commitment to modernizing government operations, we have created a seamless visitor and entry management system that combines tradition with innovation.
+              </p>
+              <p className="text-lg text-gray-700 mb-4 leading-relaxed">
+                Under the visionary leadership of the Hon'ble Vice-Chancellor of Veer Madho Singh Bhandari Uttarakhand Technical University, this system represents the future of secure and efficient administrative management.
+              </p>
+              <div className="flex items-center gap-4 mt-6">
+                <div className="w-1 h-12 bg-gradient-to-b from-amber-600 to-green-600"></div>
+                <p className="text-gray-600 italic">Building excellence in service delivery</p>
+              </div>
+            </div>
+
+            {/* Right - Image */}
+            <div className="relative">
+              <div className="relative h-96 md:h-[400px] rounded-2xl overflow-hidden shadow-2xl">
+                <Image
+                  src="/images/vcwithgovernor.jpeg"
+                  alt="Governor and Vice-Chancellor with flowers"
+                  fill
+                  className="object-cover"
+                  priority
+                />
+              </div>
+              <div className="absolute -bottom-6 -right-6 w-40 h-40 opacity-20 pointer-events-none">
+                <svg viewBox="0 0 100 100" className="w-full h-full text-amber-600">
+                  <path d="M50 10 L60 40 L90 40 L67 60 L77 90 L50 70 L23 90 L33 60 L10 40 L40 40 Z" fill="currentColor"/>
+                </svg>
+              </div>
             </div>
           </div>
         </div>
-      </header>
+      </section>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-8">
+      {/* Key Features Section */}
+      <section className="py-20 bg-gradient-to-r from-amber-50 to-green-50">
         <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center gap-3 brightness-0 invert mb-4 md:mb-0">
-              <Image src="/images/emblem_white.svg" alt="Government Logo" width={40} height={40} className="w-8 md:w-12" />
-              <div className="flex flex-col">
-                <p className="text-sm md:text-lg text-white">राजभवन उत्तराखंड</p>
-                <h1 className="text-base md:text-xl text-white font-bold">RAJBHAWAN UTTARAKHAND</h1>
+          <h2 className="text-4xl font-bold text-center text-amber-900 mb-12">Key Features</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[
+              {
+                title: "QR Code Verification",
+                desc: "Quick and secure visitor verification with advanced QR technology"
+              },
+              {
+                title: "Group Management",
+                desc: "Efficient handling of group registrations and entries"
+              },
+              {
+                title: "Real-time Analytics",
+                desc: "Live monitoring and comprehensive visitor statistics"
+              }
+            ].map((feature, idx) => (
+              <div key={idx} className="bg-white rounded-xl p-8 shadow-lg hover:shadow-xl transition-shadow">
+                <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-500 rounded-full mb-4"></div>
+                <h3 className="text-xl font-semibold text-amber-900 mb-3">{feature.title}</h3>
+                <p className="text-gray-600">{feature.desc}</p>
               </div>
-            </div>
-            <div className="text-center md:text-right">
-              <p className="text-sm text-gray-400">&copy; 2025 All rights reserved.</p>
-              <p className="text-sm text-gray-400">Developed by Uttarakhand Technical University</p>
+            ))}
+          </div>
+        </div>
+      </section>
+      <footer className="bg-gradient-to-r from-amber-800 to-orange-800 text-white py-12">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+            {/* <div className="flex items-center gap-3">
+              <Image src="/images/emblem_white.svg" alt="Logo" width={40} height={40} className="w-10 md:w-12" />
               <div>
-                <Link href="https://github.com/adityakumar-dev" className="text-white hover:text-yellow-400 transition-colors">Credits : adityakumar-dev</Link>
+                <p className="text-sm font-medium">राजभवन उत्तराखंड</p>
+                <h1 className="text-lg font-bold">RAJ BHAWAN</h1>
               </div>
+            </div> */}
+            <div className="text-center">
+              <p className="text-amber-100 text-sm">Inspired by Governor Sir</p>
+              <p className="text-amber-100 text-sm">Developed under Hon'ble Vice-Chancellor</p>
+              <p className="text-amber-100 text-sm">VMSBUTU</p>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-amber-100">&copy; 2025 All rights reserved</p>
+              <Link href="https://github.com/adityakumar-dev" className="text-amber-100 hover:text-white text-sm">Code by adityakumar-dev</Link>
             </div>
           </div>
         </div>

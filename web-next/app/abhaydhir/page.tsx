@@ -11,36 +11,43 @@ export default function InstallationGuidePage() {
   const [showWarning, setShowWarning] = useState(true);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-green-50">
       <LoadingBar />
-      <header className="w-full relative bg-cover bg-center h-screen">
-        <div
-          className="absolute inset-0 w-full h-full transition-opacity duration-1000 ease-in-out"
-          style={{
-            backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), url('/images/spring_festival/image4.jpg')`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-          }}
-        />
+      <header className="w-full relative h-screen overflow-hidden">
+        {/* Floral Background Elements */}
+        <div className="absolute inset-0 opacity-10">
+          <svg className="absolute top-20 left-10 w-32 h-32 text-amber-200 animate-pulse" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          </svg>
+          <svg className="absolute top-40 right-20 w-24 h-24 text-orange-200 animate-pulse" style={{animationDelay: '1s'}} viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          </svg>
+          <svg className="absolute bottom-32 left-20 w-28 h-28 text-green-200 animate-pulse" style={{animationDelay: '2s'}} viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          </svg>
+          <svg className="absolute bottom-20 right-10 w-20 h-20 text-amber-300 animate-pulse" style={{animationDelay: '0.5s'}} viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          </svg>
+        </div>
         
         <Navbar />
 
         {/* Hero Content */}
-        <div className="flex flex-col items-center justify-center h-[calc(100vh-80px)] px-4">
-          <div className="container mx-auto px-4 text-center relative z-10">
-            <h1 className="text-4xl md:text-7xl font-bold mb-4 text-white animate-fade-in-down leading-tight">
+        <div className="flex flex-col items-center justify-center h-[calc(100vh-80px)] px-4 relative z-10">
+          <div className="container mx-auto px-4 text-center">
+            <h1 className="text-4xl md:text-7xl font-bold mb-4 text-gray-800 animate-fade-in-down leading-tight">
               ABHAYDHIR APP
             </h1>
-            <h2 className="text-2xl md:text-6xl mb-6 text-white animate-fade-in-down leading-tight">
+            <h2 className="text-2xl md:text-6xl mb-6 text-gray-700 animate-fade-in-down leading-tight">
               Download & Installation Guide
             </h2>
-            <p className="text-lg md:text-xl mb-8 text-gray-200 animate-fade-in-up max-w-3xl mx-auto">
+            <p className="text-lg md:text-xl mb-8 text-gray-600 animate-fade-in-up max-w-3xl mx-auto">
             Abhaydhir is a mobile application that allows Security Guards to manage visitors entry and exit.
             </p>
             <a
               href="/app/app-release.apk"
               download
-              className="inline-flex items-center px-8 md:px-12 py-3 md:py-4 bg-yellow-600 text-white rounded-full text-lg md:text-xl hover:bg-yellow-500 transition duration-300 shadow-lg hover:shadow-xl"
+              className="inline-flex items-center px-8 md:px-12 py-3 md:py-4 bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-full text-lg md:text-xl hover:from-amber-700 hover:to-orange-700 transition duration-300 shadow-lg hover:shadow-xl hover:scale-105 transform"
             >
               <Download className="w-6 h-6 mr-2" />
               Download APK
@@ -166,12 +173,54 @@ export default function InstallationGuidePage() {
       {/* Back to Home or Other Pages */}
       <section className="py-8">
         <div className="container mx-auto px-4 text-center">
-          <Link href="/" className="inline-flex items-center px-5 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold">
+          <Link href="/" className="inline-flex items-center px-5 py-3 bg-gradient-to-r from-amber-600 to-orange-600 text-white rounded-lg hover:from-amber-700 hover:to-orange-700 transition-colors font-semibold hover:scale-105 transform">
             <ArrowRight className="w-5 h-5 mr-2" />
             Back to Home
           </Link>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="bg-gradient-to-r from-amber-800 to-orange-800 text-white py-12">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+            {/* Logo Section */}
+            <div className="flex items-center gap-3 brightness-0 invert">
+              <Image src="/images/emblem_white.svg" alt="Government Logo" width={40} height={40} className="w-8 md:w-12" />
+              <div className="flex flex-col">
+                <p className="text-sm md:text-lg text-white">राजभवन उत्तराखंड</p>
+                <h1 className="text-base md:text-xl text-white font-bold">RAJBHAWAN UTTARAKHAND</h1>
+              </div>
+            </div>
+
+            {/* Attribution Section */}
+            <div className="text-center">
+              <p className="text-sm md:text-base text-white/90 mb-1">
+                Inspired by Governor Sir and developed under
+              </p>
+              <p className="text-sm md:text-base text-white font-semibold">
+                Hon'ble Vice Chancellor of VMSBVTU
+              </p>
+            </div>
+
+            {/* Copyright Section */}
+            <div className="text-center md:text-right">
+              <p className="text-sm text-white/80">&copy; 2025 All rights reserved.</p>
+              <a
+                href="https://github.com/adityakumar-dev/Abhaydhir"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-white/80 hover:text-white transition-colors duration-300 inline-flex items-center gap-1"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                </svg>
+                View on GitHub
+              </a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

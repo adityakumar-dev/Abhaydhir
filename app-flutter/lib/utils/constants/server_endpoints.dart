@@ -2,7 +2,7 @@ class ServerEndpoints {
   // Base URL - for testing
   // static String baseUrl = 'https://enabled-flowing-bedbug.ngrok-free.app';
   // Base URL - for production 
-  static String baseUrl = 'https://api.vmsbutu.it.com';
+  static String baseUrl = 'api.vmsbutu.it.com';
   
 
   // ============================================================

@@ -188,18 +188,7 @@ class _SplashScreenState extends State<SplashScreen>
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Card(
-                                  color: Theme.of(context).colorScheme.surface,
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Image.asset(
-                                      'assets/images/emblem.png',
-                                      width: 64,
-                                      height: 64,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 24),
+                               
                                 Text(
                                   'अभयधीर',
                                   style: Theme.of(context)

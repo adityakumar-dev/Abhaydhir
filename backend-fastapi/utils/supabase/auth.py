@@ -1,8 +1,8 @@
 import os
-import jwt
+from jose import jwt, JWTError
 from fastapi import Request, HTTPException, status, Depends
 from utils.supabase.supabase import supabaseAdmin
-
+from utils.supabase.auth_key import get_public_key, ISSUER
 # Load environment variables
 LEGACY_JWT_SECRET = os.getenv("LEGACY_JWT_SECRET")
 REGISTER_SECURITY_KEY = os.getenv("REGISTER_SECURITY_KEY")
@@ -12,9 +12,9 @@ REGISTER_ADMIN_KEY = os.getenv("REGISTER_ADMIN_KEY")
 # JWT Middleware
 # -------------------------------------------------------------------
 async def jwt_middleware(request: Request) -> dict:
-    """Dependency to verify JWT token from Authorization header."""
     auth_header = request.headers.get("Authorization")
-    print("Token is : ", auth_header)
+    print("Token is:", auth_header)
+
     if not auth_header or not auth_header.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -25,19 +25,41 @@ async def jwt_middleware(request: Request) -> dict:
     token = auth_header.split(" ", 1)[1]
 
     try:
-        payload = jwt.decode(token, LEGACY_JWT_SECRET, algorithms=["HS256"],  options={"verify_aud": False})
-        print(payload)
-        payload['role'] = payload['app_metadata']['role']
+        public_key = get_public_key(token)
+
+        payload = jwt.decode(
+            token,
+            public_key,
+            algorithms=["ES256"],   # ← REQUIRED for Supabase with ES256
+            audience="authenticated",
+            issuer=ISSUER,
+            options={"verify_aud": True}
+        )
+
+        print("Verified payload:", payload)
+
+        # Extract role from app_metadata
+        if "app_metadata" in payload and "role" in payload["app_metadata"]:
+            payload["role"] = payload["app_metadata"]["role"]
         return payload
+
     except jwt.ExpiredSignatureError:
-        print("Token has expired")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has expired",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    except jwt.InvalidTokenError:
-        print("Invalid token")
+
+    except JWTError as e:
+        print("JWT error:", str(e))
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    except Exception as e:
+        print("Unexpected error:", str(e))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token",

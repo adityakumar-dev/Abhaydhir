@@ -157,16 +157,11 @@ class _HomeScreenState extends State<HomeScreen> {
             title: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Image.asset(
-                  'assets/images/emblem.png',
-                  height: 45,
-                  color: const Color.fromARGB(255, 3, 7, 61),
-                ),
-                const SizedBox(width: 12),
+              
                 const Column(
                   children: [
                     Text(
-                      'SPRING FESTIVAL 2025',
+                      'SPRING FESTIVAL 2026',
                       style: TextStyle(
                         fontWeight: FontWeight.w900,
                         fontSize: 12,

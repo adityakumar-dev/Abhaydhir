@@ -1,5 +1,5 @@
 "use client"
-import { Children, createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useRef, useState } from "react"
 import type { User } from "@supabase/supabase-js"
 import { supabase } from "@/lib/supabase"
 type UserContextType = {
@@ -15,18 +15,26 @@ const UserContext = createContext<UserContextType | undefined>({
 export const UserProvider  = ({children} : {children : React.ReactNode}) => {
     const [user, setUser] = useState<User | null>(null)
     const [loading, setLoading] = useState(true)
+    const initRef = useRef(false)
 
     useEffect(() => {
+        if (initRef.current) return
+        initRef.current = true
+
         supabase.auth.getSession().then(({data}) => {
-                setUser(data.session?.user ?? null)
-            
+            setUser(data.session?.user ?? null)
             setLoading(false)
         })
 
-        const { data : {subscription} ,} = supabase.auth.onAuthStateChange((event, session) => {
-            setUser(session?.user ?? null)
+        const { data : {subscription} } = supabase.auth.onAuthStateChange((_event, session) => {
+            const newUser = session?.user ?? null
+            setUser(prev => {
+                // Only update if user actually changed to avoid cascading re-renders
+                if (prev?.id === newUser?.id) return prev
+                return newUser
+            })
         })
-return subscription.unsubscribe
+        return () => subscription.unsubscribe()
     }, [])
 
     return (

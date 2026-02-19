@@ -22,7 +22,7 @@ plugins {
 }
 
 android {
-    namespace = "com.utu.abhayadhir"
+    namespace = "com.vmsb_utu.abhayadhir"
     compileSdk = 35
     ndkVersion = "27.0.12077973"
 
@@ -36,11 +36,16 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.utu.abhayadhir"
+        applicationId = "com.vmsb_utu.abhayadhir"
         minSdk = 21
         targetSdk = 35
-        versionCode = 1
+        versionCode = 2
         versionName = "1.0"
+    }
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = false   // IMPORTANT for 16KB
+        }
     }
 
     // ✅ Add signing config for release

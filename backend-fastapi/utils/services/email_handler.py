@@ -14,8 +14,8 @@ class EmailConfig:
     SMTP_PORT = 465  # SSL Port
     
     # Gmail Credentials (Use App Password)
-    EMAIL_ADDRESS = "adityakumar.devxlinux@gmail.com"
-    EMAIL_PASSWORD = "riogaktlwddorjfc"  # App password
+    EMAIL_ADDRESS = os.getenv("SMTP_EMAIL_ADDRESS", "")  # Your Gmail address
+    EMAIL_PASSWORD = os.getenv("SMTP_EMAIL_PASSWORD", "")  # Your Gmail app password
 
 
 class InvitationEmailHandler:
@@ -31,11 +31,13 @@ class InvitationEmailHandler:
         user_name: str,
         visitor_card_path: str,
         event_name: str = None,
+        visitor_card_token: str = None,
         valid_dates: str = None,
         extra_info: dict = None
     ) -> bool:
         """Send welcome email with visitor card and event details"""
         try:
+            host = os.getenv("HOST_URL", "http://localhost:8000")
             msg = MIMEMultipart()
             msg["From"] = self.email
             msg["To"] = to_email
@@ -58,6 +60,9 @@ class InvitationEmailHandler:
                                 <li>Your visitor card is your identity within the premises</li>
                                 <li>Follow all safety guidelines and protocols</li>
                             </ul>
+                            <p>Open and download your visitor card using the link below:</p>
+                            <p>Click Me: <a href="{host}/sms/view-card?token={visitor_card_token}" style='display: inline-block; padding: 10px 20px; background-color: #007bff; color: white;'>Open Visitor Card</a></p>
+
                         </div>
                         <div style='text-align: center; color: #6c757d; font-size: 12px; margin-top: 20px; border-top: 1px solid #dee2e6; padding-top: 20px;'>
                             <p>This is an automated message. Please do not reply to this email.</p>
@@ -99,6 +104,7 @@ def send_welcome_email_background(
     user_email: str,
     user_name: str,
     visitor_card_path: str,
+    visitor_card_token: str,
     event_name: str = None,
     valid_dates: str = None,
     extra_info: dict = None
@@ -112,6 +118,7 @@ def send_welcome_email_background(
                 visitor_card_path=visitor_card_path,
                 event_name=event_name,
                 valid_dates=valid_dates,
+                visitor_card_token=visitor_card_token,
                 extra_info=extra_info
             )
             if success:

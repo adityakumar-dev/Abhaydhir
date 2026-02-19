@@ -71,4 +71,38 @@ class Tourist(BaseModel):
     registered_event_id: Optional[int] = None
     extra_info: Optional[dict] = Field(default_factory=dict)
     # created_at: Optional[datetime] = None
-    email : Optional[str] = None
+    phone : Optional[str] = None
+
+
+# CREATE TABLE public.event_feedback (
+#   feedback_id BIGSERIAL PRIMARY KEY,
+
+#   event_id BIGINT NOT NULL REFERENCES events(event_id) ON DELETE CASCADE,
+
+#   rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5),
+
+#   comment TEXT,
+
+#   -- anonymous session identifier
+#   session_id UUID NOT NULL,
+
+#   -- optional fingerprint hash (device/browser hash)
+#   fingerprint TEXT,
+
+#   metadata JSONB DEFAULT '{}'::JSONB,
+
+#   submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+#   -- prevent duplicate feedback from same session for same event
+#   UNIQUE(event_id, session_id)
+# );
+
+class EventFeedback(BaseModel):
+    feedback_id: Optional[int] = None
+    event_id: int
+    rating: int
+    comment: Optional[str] = None
+    session_id: UUID
+    fingerprint: Optional[str] = None
+    metadata: Optional[dict] = Field(default_factory=dict)
+    submitted_at: Optional[datetime] = None

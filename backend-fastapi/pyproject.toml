@@ -13,6 +13,8 @@ dependencies = [
     "pillow",
     "qrcode",
     "python-multipart",
-    "python-jose[cryptography]"
+    "python-jose[cryptography]",
+    "twilio",
+    "redis>=7.2.0",
 ]
 

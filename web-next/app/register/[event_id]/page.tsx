@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   ArrowLeft,
   Download,
@@ -18,7 +18,7 @@ interface TouristRegistrationResponse {
   tourist: {
     user_id: number;
     name: string;
-    email: string;
+    phone: string;
     unique_id_type: string;
     unique_id: string;
     is_group: boolean;
@@ -35,12 +35,15 @@ interface TouristRegistrationResponse {
 
 export default function RegisterPage({ params }: { params: { event_id: string } }) {
   const router = useRouter();
-  const event_id = Number(params?.event_id);
+  const event_id = useMemo(() => Number(params?.event_id), [params?.event_id]);
   const [eventExists, setEventExists] = useState<boolean | null>(null);
+  const eventCheckRef = useRef(false);
 
   // Check if the event exists on component mount
   useEffect(() => {
-    console.log("Checking event ID:", event_id);
+    if (eventCheckRef.current) return;
+    eventCheckRef.current = true;
+
     const checkEvent = async () => {
       if (!event_id || isNaN(event_id)) {
         setEventExists(false);
@@ -55,7 +58,7 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
-    email: "",
+    phone: "",
     unique_id_type: "aadhar",
     unique_id: "",
     is_group: false,
@@ -111,8 +114,8 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
         showToast("Please enter a valid first name", "error");
         return;
       }
-      if (!formData.email) {
-        showToast("Please enter a valid email", "error");
+      if (!formData.phone) {
+        showToast("Please enter a valid phone", "error");
         return;
       }
       if (formData.is_group && formData.group_count < 2) {
@@ -120,11 +123,11 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
         return;
       }
       // Check if email exists
-       setLoadingMessage("Validating registration details...");
+      //  setLoadingMessage("Validating registration details...");
       // Call API to register tourist
       const registrationPayload = {
         name: `${formData.firstName} ${formData.lastName}`.trim(),
-        email: formData.email,
+        phone: formData.phone,
         unique_id_type: formData.unique_id_type,
         unique_id: formData.unique_id,
         is_group: formData.is_group,
@@ -145,7 +148,7 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
         setIsDownloadPopupOpen(true);
       }
       
-      showToast("Tourist registration successful! Check your email for the visitor card.", "success");
+      showToast("Tourist registration successful! Check your phone for the sms", "success");
     } catch (error: any) {
       showToast(error?.message || "Registration failed", "error");
     } finally {
@@ -174,12 +177,12 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
     return (
       <div className="space-y-4 sm:space-y-6">
         <div className="flex items-center justify-center">
-          <h1 className="text-2xl font-bold">Tourist Registration - Spring Festival 2025</h1>
+          <h1 className="text-2xl font-bold">Tourist Registration - Spring Festival 2026</h1>
         </div>
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <p className="text-sm text-blue-700">
             Register as a tourist to receive your visitor card with QR code. 
-            A welcome email with your visitor card will be sent to your registered email address.
+            A welcome sms with your visitor card url will be sent to your registered phone address.
           </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
@@ -209,14 +212,14 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
           </div>
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">Email</label>
+          <label className="text-sm font-medium text-gray-700">Phone</label>
           <input
-            type="email"
-            name="email"
-            value={formData.email}
+            type="phone"
+            name="phone"
+            value={formData.phone}
             onChange={handleInputChange}
             className="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-yellow-200 focus:border-yellow-400"
-            placeholder="Enter email"
+            placeholder="Enter phone number"
           />
         </div>
         <div className="space-y-4">

@@ -37,6 +37,8 @@ class VisitorCardGenerator:
             email_pos = (100, 670)
             id_pos = (100, 710)
             valid_pos = (100, 760)
+            group_count_pos = (100, 810)
+
             
             # Paste images with transparency
             if profile_img.mode == 'RGBA':
@@ -61,12 +63,14 @@ class VisitorCardGenerator:
             draw.text(id_pos, f"ID: {user_data['qr_data']}", fill="black", font=font_id, stroke_width=1, stroke_fill="black")
             if user_data.get("valid_dates"):
                 draw.text(valid_pos, f"Valid: {user_data['valid_dates']}", fill="black", font=font_email)
-            
+            if user_data.get("group_count") is not None:
+                draw.text(group_count_pos, f"Group Count: {user_data.get('group_count', 'N/A')}", fill="black", font=font_email)
             # Save the card
             output_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), 'static/cards'))
             os.makedirs(output_dir, exist_ok=True)
             output_path = f"{output_dir}/{user_data['name'].replace(' ', '_')}_card_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
             card.save(output_path, "PNG", quality=95)
+            print(user_data)
             
             return output_path
         

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { createEvent, getAllEvents, updateEventStatus } from "@/services/eventApi";
 import { getAllTourists } from "@/services/touristApi";
 import { getAllUsers, deleteUser } from "@/services/usersApi";
@@ -10,6 +10,7 @@ import { supabase } from "@/services/adminAuth";
 export default function AdminDashboard() {
   const router = useRouter();
   const { user } = useUser();
+  const statsLoadedRef = useRef(false);
   const [activeView, setActiveView] = useState<'home' | 'events' | 'tourists' | 'users'>('home');
   const [showEventForm, setShowEventForm] = useState(false);
   const [events, setEvents] = useState<any[]>([]);
@@ -30,10 +31,11 @@ export default function AdminDashboard() {
   const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) {
+    if (user && !statsLoadedRef.current) {
+      statsLoadedRef.current = true;
       loadStats();
     }
-  }, [user]);
+  }, [user?.id]);
 
   const loadStats = async () => {
     try {

@@ -14,7 +14,7 @@ export default function AdminPage() {
     } else {
       router.replace("/admin/auth");
     }
-  }, [user, loading, router]);
+  }, [user?.id, loading, router]);
 
   return null;
 }

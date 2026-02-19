@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from supabase_auth import datetime
 from utils.supabase.auth import jwt_middleware
 from utils.supabase.supabase import supabaseAdmin
@@ -233,11 +233,48 @@ def update_event_status(
 # frontend event requests
 # anyone can see the event is active
 @router.get("/check/{event_id}", status_code=status.HTTP_200_OK)
-async def get_active_event(event_id: int):
-    response = supabaseAdmin.table("events").select("*").eq("event_id", event_id).single().execute()
+async def get_active_event(event_id: int, request: Request):
+    """
+    Get event details with client information.
+    Captures request headers for analytics/tracking purposes.
+    """
+    # Extract client headers
+    client_ip = request.client.host if request.client else "unknown"
+    forwarded_for = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
+    actual_ip = forwarded_for if forwarded_for else client_ip
     
+
+    feeback_route = request.headers.get("feedback-check")
+      
+    
+    response = supabaseAdmin.table("events").select("*").eq("event_id", event_id).single().execute()
+    print(response)
+    if feeback_route is True : 
+        if response.get('data') is not None:
+            return {"message": "Event found", "event": response.data}
+        else : 
+            data = response.get('data')
+            if data.get('is_active') is False : 
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Event is not active"
+                )
+            start_date = data.get('start_date')
+            end_date = data.get('end_date')
+            current_time = datetime.now()
+            if current_time < start_date or current_time > end_date:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Event is not currently active"
+                )
+            return {
+            "event": response.data,
+        }
     if hasattr(response, 'data') and response.data:
-        return {"event": response.data}
+
+        return {
+            "event": response.data,
+        }
     else:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

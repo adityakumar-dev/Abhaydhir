@@ -8,7 +8,7 @@ export const API_BASE_URL =  process.env.NEXT_PUBLIC_API_URL!;
 export const url = API_BASE_URL;
 export interface RegisterData {
   name: string
-  email: string
+  phone: string
   userType: 'individual' | 'group'
   photo: File
   id_type: string,
@@ -103,7 +103,7 @@ export const api = {
   },
   async registerTourist(data: {
     name: string;
-    email: string;
+    phone: string;
     unique_id_type: string;
     unique_id: string;
     is_group: boolean;
@@ -113,7 +113,7 @@ export const api = {
   }) {
     const formData = new FormData();
     formData.append("name", data.name);
-    formData.append("email", data.email);
+    formData.append("phone", data.phone);
     formData.append("unique_id_type", data.unique_id_type);
     formData.append("unique_id", data.unique_id);
     formData.append("is_group", String(data.is_group));
@@ -139,7 +139,7 @@ export const api = {
     }
   },
 
-  async checkEventExists(event_id: number) {
+  async checkEventExists(event_id: number , is_feedback = false): Promise<boolean> {
     try {
       console.log("Checking event ID in API:", event_id);
       console.log("Event ID payload:", { event_id });
@@ -148,6 +148,7 @@ export const api = {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
+          'feedback-check': String(is_feedback), // Custom header to indicate feedback context
         },
       });
       if (!response.ok) {

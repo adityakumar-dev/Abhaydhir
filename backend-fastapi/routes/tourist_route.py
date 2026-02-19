@@ -10,6 +10,7 @@ from utils.services.public_access_link_provider import generate_public_access_li
 from utils.services.file_handlers import save_upload_file
 from template_generator import VisitorCardGenerator
 from utils.services.email_handler import send_welcome_email_background
+from utils.services.sms_handler import send_welcome_sms_background
 from utils.services.jwt_file_token import (
     generate_visitor_card_token, 
     generate_user_image_token,
@@ -27,7 +28,7 @@ router = APIRouter()
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register_tourist(
     name: str = Form(...),
-    email: str = Form(None),
+    phone: str = Form(...),
     unique_id_type: str = Form(...),
     unique_id: str = Form(...),
     is_group: bool = Form(...),
@@ -39,7 +40,7 @@ async def register_tourist(
     # Build registration object from form fields
     registration = Tourist(
         name=name,
-        email=email,
+        phone=phone,
         unique_id_type=unique_id_type,
         unique_id=unique_id,
         is_group=is_group,
@@ -49,9 +50,11 @@ async def register_tourist(
     if hasattr(registration, "user_id"):
         delattr(registration, "user_id")
 
-    # Require image
+    # Require image and phone
     if not image:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Image file is required")
+    if not phone:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Phone number is required")
 
     # Basic validation
     if not registration.name or not registration.unique_id_type or not registration.unique_id:
@@ -65,89 +68,137 @@ async def register_tourist(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "group_count must be ≥ 2 for groups")
     if not registration.registered_event_id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "registered_event_id is required")
-
+    
     # Validate active event
     event_resp = supabaseAdmin.table("events").select("*").eq("is_active", True).eq("event_id", registration.registered_event_id).execute()
     if hasattr(event_resp , 'error'):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid or inactive event")
     event_data = event_resp.data[0]
-
-    # check user email exist for the same event
-    email_check_resp = supabaseAdmin.table('tourists').select('*').eq('email', registration.email).eq('registered_event_id', registration.registered_event_id).execute()
-    if hasattr(email_check_resp, 'data') and email_check_resp.data:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "User with this email is already registered for the event")
-
+    
     # Insert tourist
-    insert_resp = supabaseAdmin.table("tourists").insert(registration.dict()).execute()
-    if hasattr(insert_resp, "error") or not insert_resp.data:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Error registering: {insert_resp.error.message}")
-    user_id = insert_resp.data[0]["user_id"]
+    try : 
 
-    # QR + Image save
-    qr_code = f"TOURIST-{user_id}"
-    image_path = save_upload_file(image, prefix=f"tourist_{user_id}")
+        insert_resp = supabaseAdmin.table("tourists").insert(registration.dict()).execute()
+        if hasattr(insert_resp, "error") or not insert_resp.data:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Error registering: {insert_resp.error.message}")
+        user_id = insert_resp.data[0]["user_id"]
 
-    meta_resp = supabaseAdmin.table("tourist_meta").insert({
-        "user_id": user_id,
-        "qr_code": qr_code,
-        "image_path": image_path
-    }).execute()
-    if hasattr(meta_resp, 'error'):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Error saving meta: {meta_resp.error.message}")
+        # QR + Image save
+        qr_code = f"TOURIST-{user_id}"
+        image_path = save_upload_file(image, prefix=f"tourist_{user_id}")
 
-    # Generate visitor card and send email in background
-    start = str(event_data.get("start_date", ""))[:10]
-    end = str(event_data.get("end_date", ""))[:10]
-    valid_dates = f"{start} to {end}"
-    
-    # Generate card synchronously (fast enough with optimization)
-    card_public_url = None
-    try:
-        generator = VisitorCardGenerator()
-        card_data = {
-            "name": registration.name,
-            "email": registration.email or "",
-            "profile_image_path": image_path,
-            "qr_data": qr_code,
-            "valid_dates": valid_dates,
-        }
-        card_path = generator.create_visitor_card(card_data)
+        meta_resp = supabaseAdmin.table("tourist_meta").insert({
+            "user_id": user_id,
+            "qr_code": qr_code,
+            "image_path": image_path
+        }).execute()
+        if hasattr(meta_resp, 'error'):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Error saving meta: {meta_resp.error.message}")
+
+        # Generate visitor card and send SMS in background
+        start = str(event_data.get("start_date", ""))[:10]
+        end = str(event_data.get("end_date", ""))[:10]
+        valid_dates = f"{start} to {end}"
         
-        # Generate JWT token for secure access (30 days validity)
-        jwt_token = generate_visitor_card_token(card_path, expires_in=86400 * 30)
-        card_public_url = f"/tourists/visitor-card/{jwt_token}"
-
-        # Background email send
-        if registration.email and background_tasks:
-            send_welcome_email_background(
-                background_tasks=background_tasks,
-                user_email=registration.email,
-                user_name=registration.name,
-                visitor_card_path=card_path,
-                event_name=event_data.get("name", "Event"),
-                valid_dates=valid_dates,
-                extra_info={"user_id": user_id, "qr_code": qr_code},
-            )
-    except Exception as e:
-        print(f"Error generating visitor card: {e}")
-        import traceback
-        traceback.print_exc()
+        # Generate card synchronously
         card_public_url = None
-    
-    print({
-        "message": "Tourist registered successfully",
-        "tourist": insert_resp.data[0],
-        "meta": meta_resp.data[0] if meta_resp.data else None,
-        "visitor_card_url": card_public_url,
-    })
+        visitor_card_token = None
+        try:
+            generator = VisitorCardGenerator()
+            card_data = {
+                "name": registration.name,
+                "phone": registration.phone or "",
+                "profile_image_path": image_path,
+                "qr_data": qr_code,
+                "valid_dates": valid_dates,
+                "group_count": registration.group_count
+            }
+            card_path = generator.create_visitor_card(card_data)
+            
+            # Generate JWT token for secure access (30 days validity)
+            visitor_card_token = generate_visitor_card_token(card_path, expires_in=None)  # No expiration for visitor cards, or set as needed
+            card_public_url = f"/tourists/visitor-card/{visitor_card_token}"
 
-    return {
-        "message": "Tourist registered successfully",
-        "tourist": insert_resp.data[0],
-        "meta": meta_resp.data[0] if meta_resp.data else None,
-        "visitor_card_url": card_public_url,
-    }
+            # # for test send also for email 
+            # if True and background_tasks:
+            #     send_welcome_email_background(
+            #         background_tasks=background_tasks,
+            #         user_email=os.getenv("TEST_MAIL"),  # For testing, send to a fixed email. Replace with actual user email if available.
+            #         user_name=registration.name,
+            #         visitor_card_path=card_path,
+            #         visitor_card_token=visitor_card_token,
 
+            #         event_name=event_data.get("name", "Event"),
+            #         valid_dates=valid_dates,
+            #         extra_info={"user_id": user_id, "qr_code": qr_code},
+            #     )
+            # Background SMS send (instead of email)
+            if phone and background_tasks:
+                send_welcome_sms_background(
+                    background_tasks=background_tasks,
+                    to_phone=phone,
+                    user_name=registration.name,
+                    visitor_card_token=visitor_card_token,
+                    event_name=event_data.get("name", "Event"),
+                    valid_dates=valid_dates,
+                    user_id=user_id,
+                )
+        except Exception as e:
+            print(f"Error generating visitor card: {e}")
+            import traceback
+            traceback.print_exc()
+            card_public_url = None
+        
+        print({
+            "message": "Tourist registered successfully",
+            "tourist": insert_resp.data[0],
+            "meta": meta_resp.data[0] if meta_resp.data else None,
+            "visitor_card_url": card_public_url,
+            "sms_sent": phone is not None,
+        })
+
+        return {
+            "message": "Tourist registered successfully",
+            "tourist": insert_resp.data[0],
+            "meta": meta_resp.data[0] if meta_resp.data else None,
+            "visitor_card_url": card_public_url,
+            "sms_sent": phone is not None,
+            "sms_view_url": f"/sms/view-card?token={visitor_card_token}" if visitor_card_token else None
+        }
+    except Exception as e:
+        # Normalize exception text
+        err_text = str(e)
+
+        # Handle PostgreSQL unique-constraint violation (duplicate key -> SQLSTATE 23505)
+        if 'duplicate key value violates unique constraint' in err_text or '23505' in err_text or 'already exists' in err_text:
+            try:
+                import re
+                m = re.search(r"Key \((?P<field>[^)]+)\)=\((?P<value>[^)]+)\)", err_text)
+                if m:
+                    field = m.group('field')
+                    value = m.group('value')
+                    friendly = f"{field.replace('_', ' ').capitalize()} '{value}' already registered"
+                else:
+                    # Fallback to parsing constraint name
+                    m2 = re.search(r'constraint "(?P<constraint>[^"]+)"', err_text)
+                    if m2:
+                        constraint = m2.group('constraint')
+                        if 'phone' in constraint:
+                            friendly = 'Phone number already registered'
+                        elif 'email' in constraint:
+                            friendly = 'Email already registered'
+                        else:
+                            friendly = 'Duplicate value already exists'
+                    else:
+                        friendly = 'Duplicate value already exists'
+            except Exception:
+                friendly = 'Duplicate value already exists'
+
+            # Preserve existing error-response structure expected by frontend
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Error registering tourist: {friendly}")
+
+        # Unknown error — preserve original format
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Error registering tourist: {err_text}")
 # ------------------------------------------------------------
 # GET ALL TOURISTS (Admin only, Paginated)
 # ------------------------------------------------------------
@@ -739,6 +790,8 @@ async def get_visitor_card(token: str):
         print(f"Error serving visitor card: {e}")
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to retrieve visitor card")
 
+
+
 # ------------------------------------------------------------
 # DOWNLOAD VISITOR CARD WITH JWT TOKEN (Public Access)
 # ------------------------------------------------------------
@@ -987,12 +1040,12 @@ async def download_event_entries(
                         if user_resp and user_resp.user:
                             verifiers_map[verifier_id] = {
                                 "name": user_resp.user.user_metadata.get("name", "Unknown"),
-                                "email": user_resp.user.email or "No Email"
+                                "phone": user_resp.user.phone or "No phone"
                             }
                     except:
                         verifiers_map[verifier_id] = {
                             "name": "Unknown",
-                            "email": "N/A"
+                            "phone": "phone"
                         }
             except Exception as e:
                 print(f"Error fetching verifiers: {e}")
@@ -1067,12 +1120,12 @@ async def download_event_entries(
             
             # Get verifier information
             verifier_id = entry_item.get("verified_by")
-            verifier_info = verifiers_map.get(verifier_id, {"name": "N/A", "email": "N/A"})
+            verifier_info = verifiers_map.get(verifier_id, {"name": "N/A", "phone": "N/A"})
             
             csv_writer.writerow([
                 entry_record.get("entry_date", ""),
                 tourist.get("name", ""),
-                tourist.get("email", ""),
+                tourist.get("phone", ""),
                 tourist.get("unique_id_type", ""),
                 tourist.get("unique_id", ""),
                 "Yes" if is_group else "No",
@@ -1085,7 +1138,7 @@ async def download_event_entries(
                 entry_item.get("entry_point", ""),
                 status,
                 verifier_info["name"],
-                verifier_info["email"]
+                verifier_info["phone"]
             ])
         
         # Prepare the response

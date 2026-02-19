@@ -15,6 +15,8 @@ module.exports = {
         "fade-in-down": "fadeInDown 1s ease-out",
         "fade-in-up": "fadeInUp 1s ease-out",
         "fade-in": "fadeIn 0.5s ease-out",
+        "pulse-soft": "pulseSoft 2s ease-in-out infinite",
+        "shimmer": "shimmer 2s linear infinite",
       },
       keyframes: {
         fadeInDown: {
@@ -28,6 +30,14 @@ module.exports = {
         fadeIn: {
           "0%": { opacity: "0" },
           "100%": { opacity: "1" },
+        },
+        pulseSoft: {
+          "0%, 100%": { opacity: "0.4", transform: "scale(1)" },
+          "50%": { opacity: "0.7", transform: "scale(1.05)" },
+        },
+        shimmer: {
+          "0%": { backgroundPosition: "-200% 0" },
+          "100%": { backgroundPosition: "200% 0" },
         },
       },
       colors: {

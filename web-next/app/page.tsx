@@ -58,7 +58,7 @@ export default function LandingPage() {
                 {/* <Link href="/about" className="text-white hover:text-amber-100 transition-colors px-2 py-2" onClick={() => setMobileMenuOpen(false)}>About</Link> */}
                 <Link href="/features" className="text-white hover:text-amber-100 transition-colors px-2 py-2" onClick={() => setMobileMenuOpen(false)}>Features</Link>
                 <Link href="/vasontutsav2025" className="text-white hover:text-amber-100 transition-colors px-2 py-2" onClick={() => setMobileMenuOpen(false)}>Past Events</Link>
-                <Link href="/register/14" className="text-white hover:text-amber-100 transition-colors px-2 py-2" onClick={() => setMobileMenuOpen(false)}>Register</Link>
+                <Link href="/register/1" className="text-white hover:text-amber-100 transition-colors px-2 py-2" onClick={() => setMobileMenuOpen(false)}>Register</Link>
                 <Link href="/abhaydhir" className="text-white hover:text-amber-100 transition-colors px-2 py-2" onClick={() => setMobileMenuOpen(false)}>App</Link>
               </div>
             </div>
@@ -103,7 +103,7 @@ export default function LandingPage() {
 
           {/* CTA Button */}
           <Link
-            href="/register/14"
+            href="/register/1"
             className="inline-block bg-gradient-to-r from-amber-600 to-orange-600 text-white px-8 md:px-12 py-3 md:py-4 rounded-full text-lg font-semibold hover:shadow-xl transition-all duration-300 hover:scale-105"
           >
             Register →

@@ -26,9 +26,18 @@ app.add_middleware(
 )
 
 # Mount static files
-os.makedirs("static/uploads", exist_ok=True)
-os.makedirs("static/cards", exist_ok=True)
+os.makedirs("static/uploads",    exist_ok=True)
+os.makedirs("static/cards",      exist_ok=True)
+os.makedirs("static/temp-card",  exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+import asyncio
+from utils.services.card_cache import run_cleanup_loop
+
+@app.on_event("startup")
+async def startup():
+    asyncio.create_task(run_cleanup_loop())
 
 # Import and include routers
 from routes.analytics_route import router as analytics_router
@@ -77,6 +86,65 @@ async def serve_signed_file(file: str, expires: int, sig: str):
 @app.get("/")
 async def check():
     return {True}
+
 @app.get("/health-check")
 async def health_check():
     return {"status": "ok"}
+
+@app.get("/debug/card-cache")
+async def debug_card_cache():
+    """
+    Dev-only: inspect the Redis card cache state and temp-card files on disk.
+    Remove or protect this endpoint before going to production.
+    """
+    import glob
+    import time
+    from utils.services.card_cache import (
+        card_redis, card_redis_ok, TEMP_CARD_DIR,
+        CARD_TTL_SECONDS, CARD_CLEANUP_INTERVAL_SECONDS,
+    )
+
+    redis_status = "connected" if card_redis_ok else "unavailable"
+
+    # Scan all card_temp:* keys from Redis
+    redis_keys = []
+    if card_redis_ok and card_redis:
+        try:
+            for key in card_redis.scan_iter("card_temp:*"):
+                val  = card_redis.get(key)
+                ttl  = card_redis.ttl(key)
+                age  = round(time.time() - float(val), 1) if val else None
+                redis_keys.append({
+                    "key":             key,
+                    "last_access_ago": f"{age}s ago" if age is not None else "unknown",
+                    "is_fresh":        age is not None and age < CARD_TTL_SECONDS,
+                    "redis_ttl_remaining": f"{ttl}s",
+                })
+        except Exception as e:
+            redis_keys = [{"error": str(e)}]
+
+    # Scan files on disk
+    disk_files = []
+    for fpath in glob.glob(f"{TEMP_CARD_DIR}/card_temp_*.png"):
+        size_kb = round(os.path.getsize(fpath) / 1024, 1)
+        age     = round(time.time() - os.path.getmtime(fpath), 1)
+        disk_files.append({
+            "file":    os.path.basename(fpath),
+            "size_kb": size_kb,
+            "age":     f"{age}s ago",
+        })
+
+    return {
+        "config": {
+            "CARD_TTL_SECONDS":              CARD_TTL_SECONDS,
+            "CARD_CLEANUP_INTERVAL_SECONDS": CARD_CLEANUP_INTERVAL_SECONDS,
+        },
+        "redis": {
+            "status": redis_status,
+            "keys":   redis_keys,
+        },
+        "disk": {
+            "directory": TEMP_CARD_DIR,
+            "files":     disk_files,
+        },
+    }

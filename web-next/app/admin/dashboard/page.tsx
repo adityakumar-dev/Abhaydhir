@@ -6,12 +6,19 @@ import { getAllUsers, deleteUser } from "@/services/usersApi";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/context/admin_context";
 import { supabase } from "@/services/adminAuth";
+import {
+  getAdminFeedbackStats,
+  getAdminFeedbackStatsPage,
+  exportFeedbackCSV,
+  type AdminFeedbackStats,
+  type PaginatedTextQuestion,
+} from "@/services/adminApi";
 
 export default function AdminDashboard() {
   const router = useRouter();
   const { user } = useUser();
   const statsLoadedRef = useRef(false);
-  const [activeView, setActiveView] = useState<'home' | 'events' | 'tourists' | 'users'>('home');
+  const [activeView, setActiveView] = useState<'home' | 'events' | 'tourists' | 'users' | 'feedback'>('home');
   const [showEventForm, setShowEventForm] = useState(false);
   const [events, setEvents] = useState<any[]>([]);
   const [tourists, setTourists] = useState<any[]>([]);
@@ -29,6 +36,15 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  /* ── Feedback analytics state ── */
+  type TextQState = { responses: string[]; page: number; totalPages: number; hasNext: boolean; loading: boolean };
+  const [feedbackEventId, setFeedbackEventId] = useState<number | null>(null);
+  const [feedbackEventName, setFeedbackEventName] = useState('');
+  const [feedbackStats, setFeedbackStats] = useState<AdminFeedbackStats | null>(null);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedbackExporting, setFeedbackExporting] = useState(false);
+  const [textQMap, setTextQMap] = useState<Record<number, TextQState>>({});
 
   useEffect(() => {
     if (user && !statsLoadedRef.current) {
@@ -148,6 +164,80 @@ export default function AdminDashboard() {
     router.replace("/admin/auth");
   };
 
+  /* ── Feedback handlers ── */
+
+  const openFeedbackForEvent = async (eventId: number, eventName: string) => {
+    setFeedbackEventId(eventId);
+    setFeedbackEventName(eventName);
+    setFeedbackStats(null);
+    setTextQMap({});
+    setFeedbackLoading(true);
+    try {
+      const stats = await getAdminFeedbackStats(eventId, 5);
+      setFeedbackStats(stats);
+      const init: Record<number, TextQState> = {};
+      for (const q of stats.questions) {
+        if (q.type === 'text') {
+          init[q.question_id] = {
+            responses: q.recent_responses ?? [],
+            page: 0,
+            totalPages: 0,
+            hasNext: q.has_more,
+            loading: false,
+          };
+        }
+      }
+      setTextQMap(init);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setFeedbackLoading(false);
+    }
+  };
+
+  const loadMoreTextResponses = async (questionId: number, currentPage: number) => {
+    const eventId = feedbackEventId;
+    if (!eventId) return;
+    setTextQMap(prev => ({ ...prev, [questionId]: { ...prev[questionId], loading: true } }));
+    const nextPage = currentPage === 0 ? 1 : currentPage + 1;
+    try {
+      const data = await getAdminFeedbackStatsPage(eventId, nextPage, 20, questionId);
+      const tq = data.questions.find(
+        (q): q is PaginatedTextQuestion => q.question_id === questionId && q.type === 'text'
+      );
+      if (tq) {
+        setTextQMap(prev => {
+          const cur = prev[questionId];
+          return {
+            ...prev,
+            [questionId]: {
+              responses: currentPage === 0 ? tq.responses : [...cur.responses, ...tq.responses],
+              page: nextPage,
+              totalPages: tq.pagination.total_pages,
+              hasNext: tq.pagination.has_next,
+              loading: false,
+            },
+          };
+        });
+      }
+    } catch (err: any) {
+      setError(err.message);
+      setTextQMap(prev => ({ ...prev, [questionId]: { ...prev[questionId], loading: false } }));
+    }
+  };
+
+  const handleExportCSV = async () => {
+    if (!feedbackEventId) return;
+    setFeedbackExporting(true);
+    try {
+      await exportFeedbackCSV(feedbackEventId);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setFeedbackExporting(false);
+    }
+  };
+
   const renderHome = () => (
     <div className="space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -196,6 +286,13 @@ export default function AdminDashboard() {
         >
           <div className="text-lg font-semibold mb-2">Manage Users</div>
           <div className="text-sm opacity-90">View and manage all users</div>
+        </button>
+        <button
+          className="bg-indigo-600 text-white p-6 rounded-xl shadow-md hover:bg-indigo-700 transition-colors"
+          onClick={() => { setActiveView('feedback'); if (events.length === 0) loadEvents(); }}
+        >
+          <div className="text-lg font-semibold mb-2">📊 Feedback Analytics</div>
+          <div className="text-sm opacity-90">View responses &amp; export CSV</div>
         </button>
       </div>
     </div>
@@ -369,6 +466,203 @@ export default function AdminDashboard() {
     </div>
   );
 
+  const renderFeedback = () => {
+    /* ── Event selector ── */
+    if (feedbackEventId === null) {
+      return (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-gray-800">Feedback Analytics</h2>
+          </div>
+          <p className="text-sm text-gray-500">Select an event to view its feedback data.</p>
+          {events.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-500 mb-4">No events loaded yet.</p>
+              <button
+                onClick={loadEvents}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+              >
+                Load Events
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {events.map((event) => (
+                <div key={event.event_id} className="bg-white rounded-xl shadow-md p-5 flex flex-col gap-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-gray-800 truncate">{event.name}</h3>
+                      <p className="text-xs text-gray-400 mt-0.5">ID {event.event_id} · {event.location}</p>
+                      <p className="text-xs text-gray-400">
+                        {new Date(event.start_date).toLocaleDateString()} – {new Date(event.end_date).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${
+                      event.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                    }`}>
+                      {event.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => openFeedbackForEvent(event.event_id, event.name)}
+                    className="w-full bg-indigo-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-colors"
+                  >
+                    View Feedback →
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    /* ── Per-event stats view ── */
+    return (
+      <div className="space-y-5">
+        {/* Header bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              onClick={() => { setFeedbackEventId(null); setFeedbackStats(null); setTextQMap({}); }}
+              className="text-sm text-gray-500 hover:text-gray-800"
+            >
+              ← All Events
+            </button>
+            <span className="text-gray-300">|</span>
+            <h2 className="text-xl font-bold text-gray-800">{feedbackEventName}</h2>
+            {feedbackStats && (
+              <span className="bg-indigo-100 text-indigo-700 text-xs font-bold px-3 py-1 rounded-full">
+                {feedbackStats.total_sessions} session{feedbackStats.total_sessions !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={handleExportCSV}
+            disabled={feedbackExporting || feedbackLoading || !feedbackStats}
+            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed transition-colors"
+          >
+            {feedbackExporting ? '⏳ Exporting…' : '⬇ Export CSV'}
+          </button>
+        </div>
+
+        {/* Loading */}
+        {feedbackLoading && (
+          <div className="text-center py-20 text-gray-400">Loading feedback data…</div>
+        )}
+
+        {/* Questions */}
+        {!feedbackLoading && feedbackStats && feedbackStats.questions.length > 0 && (
+          <div className="space-y-4">
+            {feedbackStats.questions.map((q) => {
+              /* Rating question */
+              if (q.type === 'rating') {
+                const dist = q.distribution ?? {};
+                const maxCount = Math.max(...[5, 4, 3, 2, 1].map(s => Number(dist[String(s)] ?? 0)), 1);
+                return (
+                  <div key={q.question_id} className="bg-white rounded-xl shadow-md p-6">
+                    <div className="flex items-start gap-3 mb-4">
+                      <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0">Rating</span>
+                      <div>
+                        <p className="font-semibold text-gray-800 text-sm leading-relaxed whitespace-pre-line">{q.question_text}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{q.total_answers} answer{q.total_answers !== 1 ? 's' : ''}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 mb-5">
+                      <span className="text-5xl font-black text-blue-600">{q.average.toFixed(1)}</span>
+                      <div>
+                        <div className="flex gap-0.5 text-2xl">
+                          {[1, 2, 3, 4, 5].map(s => (
+                            <span key={s} className={s <= Math.round(q.average) ? 'text-yellow-400' : 'text-gray-200'}>★</span>
+                          ))}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-0.5">avg of {q.total_answers}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      {[5, 4, 3, 2, 1].map(star => {
+                        const count = Number(dist[String(star)] ?? 0);
+                        const pct = maxCount > 0 ? (count / maxCount) * 100 : 0;
+                        return (
+                          <div key={star} className="flex items-center gap-2.5">
+                            <span className="w-3 text-xs font-bold text-gray-500 text-right">{star}</span>
+                            <span className="text-yellow-400 text-sm">★</span>
+                            <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-500"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            <span className="w-7 text-right text-xs text-gray-400">{count}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              }
+
+              /* Text question */
+              const tq = textQMap[q.question_id];
+              const responses = tq?.responses ?? [];
+              return (
+                <div key={q.question_id} className="bg-white rounded-xl shadow-md p-6">
+                  <div className="flex items-start gap-3 mb-3">
+                    <span className="bg-purple-100 text-purple-700 text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0">Text</span>
+                    <div>
+                      <p className="font-semibold text-gray-800 text-sm leading-relaxed whitespace-pre-line">{q.question_text}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{q.total_answers} response{q.total_answers !== 1 ? 's' : ''}</p>
+                    </div>
+                  </div>
+                  {responses.length === 0 ? (
+                    <p className="text-sm text-gray-400 italic px-1">No responses yet.</p>
+                  ) : (
+                    <div className="space-y-2 mb-3">
+                      {responses.map((r, i) => (
+                        <div key={i} className="text-sm text-gray-700 bg-gray-50 rounded-lg px-4 py-2.5 border-l-4 border-indigo-200">
+                          {r}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {tq?.hasNext && (
+                    <button
+                      onClick={() => loadMoreTextResponses(q.question_id, tq.page)}
+                      disabled={tq.loading}
+                      className="text-sm font-semibold text-indigo-600 hover:text-indigo-800 disabled:opacity-50 transition-colors"
+                    >
+                      {tq.loading
+                        ? '⏳ Loading…'
+                        : tq.page === 0
+                          ? `📋 Load all ${q.total_answers} responses`
+                          : `⬇ Load more responses`}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {!feedbackLoading && feedbackStats && feedbackStats.questions.length === 0 && (
+          <div className="text-center py-12 text-gray-400">No feedback questions configured for this event.</div>
+        )}
+
+        {!feedbackLoading && !feedbackStats && (
+          <div className="text-center py-12 text-gray-400">
+            Failed to load feedback.{' '}
+            <button
+              onClick={() => openFeedbackForEvent(feedbackEventId!, feedbackEventName)}
+              className="text-indigo-600 hover:underline"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-yellow-50 to-white">
       {/* Header */}
@@ -416,6 +710,7 @@ export default function AdminDashboard() {
         {activeView === 'events' && renderEvents()}
         {activeView === 'tourists' && renderTourists()}
         {activeView === 'users' && renderUsers()}
+        {activeView === 'feedback' && renderFeedback()}
       </div>
 
       {/* Event Form Modal */}

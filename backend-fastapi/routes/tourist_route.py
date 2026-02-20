@@ -12,11 +12,13 @@ from template_generator import VisitorCardGenerator
 from utils.services.email_handler import send_welcome_email_background
 from utils.services.sms_handler import send_welcome_sms_background
 from utils.services.jwt_file_token import (
-    generate_visitor_card_token, 
+    generate_card_token,
     generate_user_image_token,
     verify_file_token,
     validate_file_path_security
 )
+from io import BytesIO
+from utils.services.card_cache import TEMP_CARD_DIR, touch_card, is_card_fresh
 import jwt
 import os
 
@@ -100,39 +102,21 @@ async def register_tourist(
         end = str(event_data.get("end_date", ""))[:10]
         valid_dates = f"{start} to {end}"
         
-        # Generate card synchronously
+        # Deterministic temp-card path — same user always maps to the same file
+        card_temp_path = f"{TEMP_CARD_DIR}/card_temp_{user_id}.png"
         card_public_url = None
         visitor_card_token = None
         try:
-            generator = VisitorCardGenerator()
-            card_data = {
-                "name": registration.name,
-                "phone": registration.phone or "",
-                "profile_image_path": image_path,
-                "qr_data": qr_code,
-                "valid_dates": valid_dates,
-                "group_count": registration.group_count
-            }
-            card_path = generator.create_visitor_card(card_data)
-            
-            # Generate JWT token for secure access (30 days validity)
-            visitor_card_token = generate_visitor_card_token(card_path, expires_in=None)  # No expiration for visitor cards, or set as needed
+
+            visitor_card_token = generate_card_token(
+                user_id=user_id,
+                user_name=registration.name,
+                event_name=event_data.get("name", ""),
+                valid_dates=valid_dates,
+                card_temp_path=card_temp_path,
+            )
             card_public_url = f"/tourists/visitor-card/{visitor_card_token}"
 
-            # # for test send also for email 
-            # if True and background_tasks:
-            #     send_welcome_email_background(
-            #         background_tasks=background_tasks,
-            #         user_email=os.getenv("TEST_MAIL"),  # For testing, send to a fixed email. Replace with actual user email if available.
-            #         user_name=registration.name,
-            #         visitor_card_path=card_path,
-            #         visitor_card_token=visitor_card_token,
-
-            #         event_name=event_data.get("name", "Event"),
-            #         valid_dates=valid_dates,
-            #         extra_info={"user_id": user_id, "qr_code": qr_code},
-            #     )
-            # Background SMS send (instead of email)
             if phone and background_tasks:
                 send_welcome_sms_background(
                     background_tasks=background_tasks,
@@ -144,9 +128,7 @@ async def register_tourist(
                     user_id=user_id,
                 )
         except Exception as e:
-            print(f"Error generating visitor card: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"Error generating visitor card token: {e}")
             card_public_url = None
         
         print({
@@ -739,110 +721,152 @@ async def get_user_image_token(
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to generate image token")
 
 
+# ─── Card cache helper ───────────────────────────────────────────────────────
+async def _get_or_generate_card_path(user_id: int, card_temp_path: str) -> str:
+    """
+    Return a valid path to the visitor card PNG, using a file cache under static/temp-card/.
+
+    Cache HIT  (file on disk + Redis says it's fresh):
+        → update last-access timestamp in Redis → return existing file path.
+
+    Cache MISS (file absent or Redis says it's stale):
+        → query tourists / tourist_meta / events
+        → generate PNG with VisitorCardGenerator.generate_card_in_memory()
+        → write to card_temp_path (deterministic per user_id)
+        → stamp Redis timestamp → return path.
+
+    Multiple simultaneous requests for the same user_id are fine because:
+        - writing a completed PNG over the same path is an atomic OS rename on Linux;
+        - even if two workers race, the second write just overwrites an identical file.
+    """
+    os.makedirs(TEMP_CARD_DIR, exist_ok=True)
+
+    # ── Cache hit ──────────────────────────────────────────────────────────
+    if os.path.exists(card_temp_path) and is_card_fresh(user_id):
+        touch_card(user_id)
+        return card_temp_path
+
+    # ── Cache miss — fetch from DB and render ──────────────────────────────
+    tourist_resp = supabaseAdmin.table("tourists").select("*").eq("user_id", user_id).single().execute()
+    if not tourist_resp.data:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Tourist not found")
+    tourist = tourist_resp.data
+
+    meta_resp = supabaseAdmin.table("tourist_meta").select("image_path, qr_code").eq("user_id", user_id).execute()
+    meta = meta_resp.data[0] if meta_resp.data else {}
+
+    event_id = tourist.get("registered_event_id")
+    event_resp = supabaseAdmin.table("events").select("name, start_date, end_date").eq("event_id", event_id).single().execute()
+    event = event_resp.data or {}
+
+    start = str(event.get("start_date", ""))[:10]
+    end   = str(event.get("end_date",   ""))[:10]
+
+    card_data = {
+        "name":              tourist.get("name", ""),
+        "unique_id":         f"{tourist.get('unique_id_type', '')}: {tourist.get('unique_id', '')}",
+        "profile_image_path": meta.get("image_path"),
+        "qr_data":           meta.get("qr_code") or f"TOURIST-{user_id}",
+        "valid_dates":        f"{start} to {end}",
+        "group_count":        tourist.get("group_count", 1),
+    }
+
+    generator = VisitorCardGenerator()
+    card_bytes = generator.generate_card_in_memory(card_data)
+
+    # Write to a tmp file first, then rename — prevents half-written files being served
+    tmp_path = card_temp_path + ".tmp"
+    with open(tmp_path, "wb") as f:
+        f.write(card_bytes.read())
+    os.replace(tmp_path, card_temp_path)  # atomic on Linux
+
+    touch_card(user_id)
+    return card_temp_path
+
+
 # ------------------------------------------------------------
-# SERVE VISITOR CARD WITH JWT TOKEN (Public Access)
+# SERVE VISITOR CARD — temp-card file cache (Public Access)
 # ------------------------------------------------------------
 @router.get("/visitor-card/{token}", status_code=status.HTTP_200_OK)
 async def get_visitor_card(token: str):
     """
-    Serve visitor card using JWT token for security
-    URL format: /tourists/visitor-card/{jwt_token}
+    Serve the visitor card PNG.
+    First request → generated fresh from DB and cached in static/temp-card/.
+    Subsequent requests within the TTL window → served directly from disk (no DB hit).
+    Cache is refreshed by touching the Redis last-access key on every hit.
     """
     try:
-        # Decode and verify JWT token
         payload = verify_file_token(token, expected_type="visitor_card")
-        
-        # Get file path from payload
-        file_path = payload.get("file_path")
-        if not file_path:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid token payload")
-        
-        # Security check: Ensure file is within allowed directories
-        allowed_dirs = [
-            "static/cards",
-            "static/uploads"
-        ]
-        
-        if not validate_file_path_security(file_path, allowed_dirs):
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "Access to this file is not allowed")
-        
-        # Check if file exists
-        if not os.path.exists(file_path):
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Visitor card not found")
-        
-        # Return the file
+        user_id = payload.get("user_id")
+        if not user_id:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid token: missing user_id")
+
+        # card_temp_path is baked into the token; fall back to default if old token
+        card_temp_path = payload.get("card_temp_path") or f"{TEMP_CARD_DIR}/card_temp_{user_id}.png"
+        path = await _get_or_generate_card_path(int(user_id), card_temp_path)
+
         return FileResponse(
-            file_path,
+            path,
             media_type="image/png",
             headers={
-                "Cache-Control": "public, max-age=3600",
-                "Access-Control-Allow-Origin": "*"
-            }
+                "Cache-Control": "public, max-age=300",
+                "Access-Control-Allow-Origin": "*",
+            },
         )
-        
+
     except jwt.ExpiredSignatureError:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Token has expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Invalid token")
     except ValueError as e:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error serving visitor card: {e}")
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to retrieve visitor card")
-
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to generate visitor card")
 
 
 # ------------------------------------------------------------
-# DOWNLOAD VISITOR CARD WITH JWT TOKEN (Public Access)
+# DOWNLOAD VISITOR CARD — temp-card file cache (Public Access)
 # ------------------------------------------------------------
 @router.get("/download-visitor-card/{token}", status_code=status.HTTP_200_OK)
 async def download_visitor_card(token: str):
     """
-    Download visitor card using JWT token
-    URL format: /tourists/download-visitor-card/{jwt_token}
-    Adds Content-Disposition header to force download
+    Download the visitor card PNG.
+    Same cache logic as the serve endpoint — no duplicate DB queries if both
+    endpoints are hit in quick succession for the same user.
     """
     try:
-        # Decode and verify JWT token
         payload = verify_file_token(token, expected_type="visitor_card")
-        
-        # Get file path from payload
-        file_path = payload.get("file_path")
-        if not file_path:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid token payload")
-        
-        # Security check: Ensure file is within allowed directories
-        allowed_dirs = [
-            "static/cards",
-            "static/uploads"
-        ]
-        
-        if not validate_file_path_security(file_path, allowed_dirs):
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "Access to this file is not allowed")
-        
-        # Check if file exists
-        if not os.path.exists(file_path):
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Visitor card not found")
-        
-        # Return the file with download header
+        user_id = payload.get("user_id")
+        if not user_id:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid token: missing user_id")
+
+        card_temp_path = payload.get("card_temp_path") or f"{TEMP_CARD_DIR}/card_temp_{user_id}.png"
+        path = await _get_or_generate_card_path(int(user_id), card_temp_path)
+        tourist_name = payload.get("user_name", f"tourist_{user_id}").replace(" ", "_")
+
         return FileResponse(
-            file_path,
+            path,
             media_type="image/png",
             headers={
-                "Content-Disposition": f"attachment; filename={os.path.basename(file_path)}",
-                "Access-Control-Allow-Origin": "*"
-            }
+                "Content-Disposition": f"attachment; filename=visitor_card_{tourist_name}.png",
+                "Access-Control-Allow-Origin": "*",
+            },
         )
-        
+
     except jwt.ExpiredSignatureError:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Token has expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Invalid token")
     except ValueError as e:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error downloading visitor card: {e}")
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to download visitor card")
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to generate visitor card")
 
 
 # ------------------------------------------------------------

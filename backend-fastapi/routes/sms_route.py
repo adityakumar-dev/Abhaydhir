@@ -36,25 +36,16 @@ async def view_visitor_card(token: str):
     try:
         # Decode and verify JWT token
         payload = verify_file_token(token, expected_type="visitor_card")
-        
-        # Get file path from payload
-        file_path = payload.get("file_path")
-        if not file_path:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid token payload")
-        
-        # Security check
-        allowed_dirs = ["static/cards", "static/uploads"]
-        if not validate_file_path_security(file_path, allowed_dirs):
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "Access to this file is not allowed")
-        
-        # Check if file exists
-        if not os.path.exists(file_path):
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Visitor card not found")
-        
-        # Get base URL for constructing download link
+
+        # Token now carries user_id — card is generated on-the-fly, no file on disk
+        user_id = payload.get("user_id")
+        if not user_id:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid token payload: missing user_id")
+
+        # Both URLs point to on-the-fly generation endpoints
         base_url = os.getenv("BASE_URL", "http://localhost:8000")
-        download_url = f"{base_url}/sms/download-card?token={token}"
         view_image_url = f"{base_url}/tourists/visitor-card/{token}"
+        download_url = f"{base_url}/tourists/download-visitor-card/{token}"
         
         
         # Return HTML page using external template file
@@ -97,37 +88,14 @@ async def view_visitor_card(token: str):
 @router.get("/download-card", status_code=status.HTTP_200_OK)
 async def download_visitor_card_sms(token: str):
     """
-    Download visitor card via SMS link
-    URL format: /sms/download-card?token={jwt_token}
+    Redirect to the on-the-fly visitor card download endpoint.
+    Kept for backward compatibility with existing SMS links.
     """
+    from fastapi.responses import RedirectResponse
     try:
-        # Decode and verify JWT token
-        payload = verify_file_token(token, expected_type="visitor_card")
-        
-        # Get file path from payload
-        file_path = payload.get("file_path")
-        if not file_path:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid token payload")
-        
-        # Security check
-        allowed_dirs = ["static/cards", "static/uploads"]
-        if not validate_file_path_security(file_path, allowed_dirs):
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "Access to this file is not allowed")
-        
-        # Check if file exists
-        if not os.path.exists(file_path):
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Visitor card not found")
-        
-        # Return the file with download header
-        return FileResponse(
-            file_path,
-            media_type="image/png",
-            headers={
-                "Content-Disposition": f"attachment; filename=visitor_card.png",
-                "Access-Control-Allow-Origin": "*"
-            }
-        )
-        
+        verify_file_token(token, expected_type="visitor_card")
+        base_url = os.getenv("BASE_URL", "http://localhost:8000")
+        return RedirectResponse(url=f"{base_url}/tourists/download-visitor-card/{token}", status_code=302)
     except jwt.ExpiredSignatureError:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Token has expired")
     except jwt.InvalidTokenError:
@@ -135,7 +103,7 @@ async def download_visitor_card_sms(token: str):
     except ValueError as e:
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(e))
     except Exception as e:
-        logger.error(f"Error downloading visitor card: {e}")
+        logger.error(f"Error redirecting to visitor card download: {e}")
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to download visitor card")
 
 

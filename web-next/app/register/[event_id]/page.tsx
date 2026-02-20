@@ -216,6 +216,7 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
           <input
             type="phone"
             name="phone"
+            maxLength={10}
             value={formData.phone}
             onChange={handleInputChange}
             className="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-yellow-200 focus:border-yellow-400"

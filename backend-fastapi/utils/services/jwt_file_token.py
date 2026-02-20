@@ -110,6 +110,33 @@ def validate_file_path_security(file_path: str, allowed_dirs: list) -> bool:
     return any(abs_file_path.startswith(allowed_dir) for allowed_dir in allowed_abs_dirs)
 
 
+def generate_card_token(
+    user_id: int,
+    user_name: str = "",
+    event_name: str = "",
+    valid_dates: str = "",
+    card_temp_path: str = "",
+    expires_in: Optional[int] = None
+) -> str:
+    """
+    Generate a JWT token for visitor card access.
+    Encodes user_id + deterministic card_temp_path so the endpoint can serve from
+    the temp-card cache or regenerate without touching the database unnecessarily.
+    """
+    payload = {
+        "user_id": user_id,
+        "type": "visitor_card",
+        "user_name": user_name,
+        "event_name": event_name,
+        "valid_dates": valid_dates,
+        "card_temp_path": card_temp_path,
+        "iat": datetime.utcnow(),
+    }
+    if expires_in is not None:
+        payload["exp"] = datetime.utcnow() + timedelta(seconds=expires_in)
+    return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+
+
 def generate_visitor_card_token(file_path: str, expires_in: Optional[int] = 86400 * 30) -> str:
     """
     Generate a JWT token for visitor card access

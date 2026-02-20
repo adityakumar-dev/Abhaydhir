@@ -106,7 +106,7 @@ export default function LandingPage() {
             href="/register/1"
             className="inline-block bg-gradient-to-r from-amber-600 to-orange-600 text-white px-8 md:px-12 py-3 md:py-4 rounded-full text-lg font-semibold hover:shadow-xl transition-all duration-300 hover:scale-105"
           >
-            Register →
+            Spring Festival 2026 Register →
           </Link>
         </div>
       </header>

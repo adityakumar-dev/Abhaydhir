@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from supabase_auth import datetime
+from datetime import datetime, timezone
 from utils.supabase.auth import jwt_middleware
 from utils.supabase.supabase import supabaseAdmin
 from utils.models.api_models import Event
@@ -242,39 +242,65 @@ async def get_active_event(event_id: int, request: Request):
     client_ip = request.client.host if request.client else "unknown"
     forwarded_for = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
     actual_ip = forwarded_for if forwarded_for else client_ip
-    
+    user_agent = request.headers.get("User-Agent", "unknown")
 
-    feeback_route = request.headers.get("feedback-check")
+    feeback_route = request.headers.get("feedback-check", "false")
       
     
     response = supabaseAdmin.table("events").select("*").eq("event_id", event_id).single().execute()
     print(response)
-    if feeback_route is True : 
-        if response.get('data') is not None:
-            return {"message": "Event found", "event": response.data}
-        else : 
-            data = response.get('data')
-            if data.get('is_active') is False : 
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Event is not active"
-                )
-            start_date = data.get('start_date')
-            end_date = data.get('end_date')
-            current_time = datetime.now()
+    print("Feedback route header:", feeback_route)
+
+    if response is None or response.data is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Event with ID {event_id} not found"
+        )
+    
+    if hasattr(response, 'data') and response.data:
+        data = response.data
+        
+        # Check if event is active
+        if data.get('is_active') is False: 
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Event is not active"
+            )
+        
+        # Parse and validate date range
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        current_time = datetime.now(timezone.utc)
+        
+        if isinstance(start_date, str):
+            start_date = datetime.fromisoformat(start_date.replace('Z', '+00:00')).replace(tzinfo=timezone.utc)
+        if isinstance(end_date, str):
+            end_date = datetime.fromisoformat(end_date.replace('Z', '+00:00')).replace(tzinfo=timezone.utc)
+       
+        
+        # Return based on feedback route header
+        print(feeback_route == "false")
+        print(feeback_route)
+        if feeback_route == "false": 
+            print("Normal register event check - returning event data only")
+            return {"event": data}
+        else: 
+            print("Feedback route - returning event data with client headers")
+             
             if current_time < start_date or current_time > end_date:
+                print(f"Current time {current_time} is outside event date range {start_date} to {end_date}")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Event is not currently active"
                 )
-            return {
-            "event": response.data,
-        }
-    if hasattr(response, 'data') and response.data:
-
-        return {
-            "event": response.data,
-        }
+            else:
+                return {
+                    "event": data,
+                    "client_info": {
+                        "user_agent": user_agent,
+                        "ip_address": client_ip
+                    }
+                }
     else:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

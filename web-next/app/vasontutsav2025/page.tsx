@@ -88,7 +88,7 @@ export default function VasontutsavPage() {
         <div className="flex flex-col items-center justify-center h-[calc(100vh-80px)] px-4">
           <div className="container mx-auto px-4 text-center relative z-10">
             <h1 className="text-4xl md:text-7xl font-bold mb-4 text-white animate-fade-in-down leading-tight">
-              SPRING FESTIVAL 2024
+              SPRING FESTIVAL 2025
             </h1>
             <h2 className="text-2xl md:text-6xl mb-6 text-white animate-fade-in-down leading-tight">
               Success Story & Analytics
@@ -235,7 +235,7 @@ export default function VasontutsavPage() {
             </div>
 
             <div className="text-center order-3 md:order-2">
-              <p className="text-sm md:text-base text-gray-400">&copy; 2025 All rights reserved.</p>
+              <p className="text-sm md:text-base text-gray-400">&copy; 2026 All rights reserved.</p>
               <p className="text-sm md:text-base text-gray-400">Developed by Uttarakhand Technical University</p>
             </div>
 

@@ -90,12 +90,9 @@ class VisitorCardGenerator:
                                 fn_name, fill="#1a1a5e", stroke=2)
             text_y += 280
 
-        uid = user_data.get("unique_id", "")
-        if uid:
-            if ":" in uid:
-                key, val = uid.split(":", 1)
-                uid = f"{key.strip().title()}: {val.strip()}"
-            self._draw_centered(draw, uid, RECT_X1 + 50, text_y, text_w,
+        phone = user_data.get("phone", "")
+        if phone:
+            self._draw_centered(draw, f"Phone: {phone}", RECT_X1 + 50, text_y, text_w,
                                 fn_detail, fill="#2c2c2c")
             text_y += 200
 

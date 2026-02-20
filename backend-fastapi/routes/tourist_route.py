@@ -763,12 +763,12 @@ async def _get_or_generate_card_path(user_id: int, card_temp_path: str) -> str:
     end   = str(event.get("end_date",   ""))[:10]
 
     card_data = {
-        "name":              tourist.get("name", ""),
-        "unique_id":         f"{tourist.get('unique_id_type', '')}: {tourist.get('unique_id', '')}",
+        "name":               tourist.get("name", ""),
+        "phone":              tourist.get("phone", ""),
         "profile_image_path": meta.get("image_path"),
-        "qr_data":           meta.get("qr_code") or f"TOURIST-{user_id}",
-        "valid_dates":        f"{start} to {end}",
-        "group_count":        tourist.get("group_count", 1),
+        "qr_data":            meta.get("qr_code") or f"TOURIST-{user_id}",
+        "valid_dates":         f"{start} to {end}",
+        "group_count":         tourist.get("group_count", 1),
     }
 
     generator = VisitorCardGenerator()

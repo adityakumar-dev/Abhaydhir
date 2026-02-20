@@ -18,8 +18,8 @@ export default function Navbar() {
             <Image src="/images/emblem_white.svg" alt="Logo" width={40} height={40} 
               className="w-8 h-8 md:w-10 md:h-10 brightness-0 invert" />
             <div className="flex flex-col">
-              <p className="text-xs md:text-sm text-white">राजभवन उत्तराखंड</p>
-              <h1 className="text-sm md:text-lg text-white font-bold">RAJBHAWAN UTTARAKHAND</h1>
+              <p className="text-xs md:text-sm text-white">लोक भवन उत्तराखंड</p>
+              <h1 className="text-sm md:text-lg text-white font-bold">LOK BHAVAN UTTARAKHAND</h1>
               <p className="text-[10px] md:text-xs text-yellow-400">Visitor & Entry Management System</p>
             </div>
           </div>

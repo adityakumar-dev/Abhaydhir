@@ -5,12 +5,26 @@ import Link from "next/link";
 import { Download, ArrowLeft, Loader2, AlertTriangle } from "lucide-react";
 import { resolveShortCode, getVisitorCard } from "@/services/touristApi";
 
+
 /**
  * Module-level caches — survive React Strict Mode unmount→remount cycles.
  * useEffect runs multiple times in dev, but the cache prevents duplicate API calls.
+ * Lazily initialized to avoid serialization issues during build time.
  */
-const _resolveCache = new Map<string, Promise<any>>();
-const _cardBlobCache = new Map<string, Blob>();
+let _resolveCache: Map<string, Promise<any>> | undefined;
+let _cardBlobCache: Map<string, Blob> | undefined;
+
+function getResolveCache() {
+  if (typeof window === 'undefined') return new Map();
+  _resolveCache ??= new Map();
+  return _resolveCache;
+}
+
+function getCardBlobCache() {
+  if (typeof window === 'undefined') return new Map();
+  _cardBlobCache ??= new Map();
+  return _cardBlobCache;
+}
 
 export default function VisitorCardPage({ params }: { params: { code: string } }) {
   const shortCode = useMemo(() => String(params.code), [params.code]);
@@ -26,31 +40,34 @@ export default function VisitorCardPage({ params }: { params: { code: string } }
     let cancelled = false;
 
     // Use cached promise if available (survives Strict Mode remounts)
+    const resolveCache = getResolveCache();
+    const cardBlobCache = getCardBlobCache();
+
     const promise =
-      _resolveCache.get(shortCode) ??
+      resolveCache.get(shortCode) ??
       resolveShortCode(shortCode).then(async (data) => {
         // Cache the blob too
-        if (!_cardBlobCache.has(data.token)) {
+        if (!cardBlobCache.has(data.token)) {
           const blob = await getVisitorCard(data.token);
-          _cardBlobCache.set(data.token, blob);
+          cardBlobCache.set(data.token, blob);
         }
         return data;
       });
 
-    _resolveCache.set(shortCode, promise);
+    resolveCache.set(shortCode, promise);
 
     promise
-      .then((data) => {
+      .then((data: any) => {
         if (cancelled) return;
         // Use cached blob
-        const blob = _cardBlobCache.get(data.token);
+        const blob = cardBlobCache.get(data.token);
         if (blob) {
           const url = URL.createObjectURL(blob);
           setCardImageUrl(url);
         }
         setResolveStatus("success");
       })
-      .catch((err) => {
+      .catch((err: any) => {
         if (cancelled) return;
         setError((err as Error).message);
         setResolveStatus("error");

@@ -77,7 +77,7 @@ class VisitorCardGenerator:
         # Rectangle inner text area: x 250..3125, below circle (bottom ≈ y 2325)
         draw   = ImageDraw.Draw(card)
         RECT_X1, RECT_X2 = 250, 3125
-        text_w = RECT_X2 - RECT_X1 - 100      # 2775 px usable width
+        text_w = RECT_X2 - RECT_X1 - 300      # 2575 px usable width (150px padding per side)
         text_y = 2430                           # below circle bottom
 
         fn_name   = self._font(200)
@@ -86,25 +86,27 @@ class VisitorCardGenerator:
 
         name = user_data.get("name", "")
         if name:
-            self._draw_centered(draw, name, RECT_X1 + 50, text_y, text_w,
-                                fn_name, fill="#1a1a5e", stroke=2)
+            # Auto-scale name if too long
+            actual_font = self._fit_text(draw, name, text_w, fn_name, min_size=100)
+            self._draw_centered(draw, name, RECT_X1 + 150, text_y, text_w,
+                                actual_font, fill="#1a1a5e", stroke=2)
             text_y += 280
 
         phone = user_data.get("phone", "")
         if phone:
-            self._draw_centered(draw, f"Phone: {phone}", RECT_X1 + 50, text_y, text_w,
+            self._draw_centered(draw, f"Phone: {phone}", RECT_X1 + 150, text_y, text_w,
                                 fn_detail, fill="#2c2c2c")
             text_y += 200
 
         qr_str = user_data.get("qr_data", "")
         if qr_str:
-            self._draw_centered(draw, f"ID: {qr_str}", RECT_X1 + 50, text_y, text_w,
+            self._draw_centered(draw, f"ID: {qr_str}", RECT_X1 + 150, text_y, text_w,
                                 fn_detail, fill="#2c2c2c")
             text_y += 200
 
         dates = user_data.get("valid_dates", "")
         if dates:
-            self._draw_centered(draw, f"Valid: {dates}", RECT_X1 + 50, text_y, text_w,
+            self._draw_centered(draw, f"Valid: {dates}", RECT_X1 + 150, text_y, text_w,
                                 fn_small, fill="#444444")
             text_y += 170
 
@@ -115,7 +117,7 @@ class VisitorCardGenerator:
                 label = f"Group: {gc_int} {'person' if gc_int == 1 else 'persons'}"
             except (ValueError, TypeError):
                 label = f"Group: {gc}"
-            self._draw_centered(draw, label, RECT_X1 + 50, text_y, text_w,
+            self._draw_centered(draw, label, RECT_X1 + 150, text_y, text_w,
                                 fn_small, fill="#444444")
 
         # ── serialise ─────────────────────────────────────────────────
@@ -218,6 +220,40 @@ class VisitorCardGenerator:
             kwargs["stroke_width"] = stroke
             kwargs["stroke_fill"] = fill
         draw.text((tx, y), text, **kwargs)
+
+    def _fit_text(
+        self,
+        draw: ImageDraw.ImageDraw,
+        text: str,
+        max_width: int,
+        initial_font: ImageFont.FreeTypeFont,
+        min_size: int = 50,
+    ) -> ImageFont.FreeTypeFont:
+        """
+        Return a font that fits *text* within *max_width*.
+        Starts at *initial_font* size and reduces if necessary down to *min_size*.
+        """
+        bbox = draw.textbbox((0, 0), text, font=initial_font)
+        text_w = bbox[2] - bbox[0]
+        if text_w <= max_width:
+            return initial_font
+        
+        # Extract current font size from the font's path or estimate
+        try:
+            current_size = initial_font.size
+        except AttributeError:
+            current_size = 200  # fallback
+        
+        # Binary search or linear reduction for the right size
+        for size in range(current_size - 10, min_size - 1, -5):
+            test_font = self._font(size)
+            bbox = draw.textbbox((0, 0), text, font=test_font)
+            test_w = bbox[2] - bbox[0]
+            if test_w <= max_width:
+                return test_font
+        
+        # Return minimum size if still too wide
+        return self._font(min_size)
 
     # ── backward-compat shim ──────────────────────────────────────────────
 

@@ -69,7 +69,7 @@ async def view_visitor_card(token: str):
                          .replace('%EVENT_NAME%', event_title) \
                          .replace('%VALID_DATES%', valid_dates_text)
 
-        return HTMLResponse(content=html_content, status_code=200)
+        return FileResponse(content)
         
     except jwt.ExpiredSignatureError:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Token has expired")

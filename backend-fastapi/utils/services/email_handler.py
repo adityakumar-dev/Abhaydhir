@@ -31,13 +31,12 @@ class InvitationEmailHandler:
         user_name: str,
         visitor_card_path: str,
         event_name: str = None,
-        visitor_card_token: str = None,
         valid_dates: str = None,
         extra_info: dict = None
     ) -> bool:
         """Send welcome email with visitor card and event details"""
         try:
-            host = os.getenv("HOST_URL", "http://localhost:8000")
+            host = os.getenv("HOST_URL", "http://localhost:3000")
             msg = MIMEMultipart()
             msg["From"] = self.email
             msg["To"] = to_email
@@ -61,7 +60,7 @@ class InvitationEmailHandler:
                                 <li>Follow all safety guidelines and protocols</li>
                             </ul>
                             <p>Open and download your visitor card using the link below:</p>
-                            <p>Click Me: <a href="{host}/sms/view-card?token={visitor_card_token}" style='display: inline-block; padding: 10px 20px; background-color: #007bff; color: white;'>Open Visitor Card</a></p>
+                            <p>Click Me: <a href="{host}/c/{extra_info['short_code']}" style='display: inline-block; padding: 10px 20px; background-color: #007bff; color: white;'>Open Visitor Card</a></p>
 
                         </div>
                         <div style='text-align: center; color: #6c757d; font-size: 12px; margin-top: 20px; border-top: 1px solid #dee2e6; padding-top: 20px;'>
@@ -104,7 +103,6 @@ def send_welcome_email_background(
     user_email: str,
     user_name: str,
     visitor_card_path: str,
-    visitor_card_token: str,
     event_name: str = None,
     valid_dates: str = None,
     extra_info: dict = None
@@ -118,7 +116,6 @@ def send_welcome_email_background(
                 visitor_card_path=visitor_card_path,
                 event_name=event_name,
                 valid_dates=valid_dates,
-                visitor_card_token=visitor_card_token,
                 extra_info=extra_info
             )
             if success:

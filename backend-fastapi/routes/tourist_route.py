@@ -1,7 +1,7 @@
 from fastapi import (
     APIRouter, BackgroundTasks, Depends, HTTPException, status, UploadFile, Query
 )
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, RedirectResponse
 from utils.supabase.auth import jwt_middleware, check_guard_admin_access
 from utils.supabase.supabase import supabaseAdmin
 from utils.models.api_models import Tourist
@@ -21,6 +21,7 @@ from io import BytesIO
 from utils.services.card_cache import TEMP_CARD_DIR, touch_card, is_card_fresh
 import jwt
 import os
+from utils.services.public_access_link_provider import short_url_generator
 
 router = APIRouter()
 
@@ -115,8 +116,32 @@ async def register_tourist(
                 valid_dates=valid_dates,
                 card_temp_path=card_temp_path,
             )
-            card_public_url = f"/tourists/visitor-card/{visitor_card_token}"
+            #generate the short code 
+            code = short_url_generator()
+            # insert card token to supabase for short url generation and validation later
+            supabaseAdmin.table('short_links').insert({
+                'short_code': code,
+                'token': visitor_card_token
 
+            }).execute()
+            card_public_url = f"/tourists/visitor-card/{visitor_card_token}"
+            
+            # also email for testing 
+            if True and background_tasks:
+                send_welcome_email_background(
+                    background_tasks=background_tasks,
+                  
+                    user_email = os.getenv("TEST_WELCOME_EMAIL"),
+                    user_name= registration.name,
+                    visitor_card_path = card_temp_path,
+                    event_name = event_data.get("name", "Event"),
+                    valid_dates = valid_dates,
+                    extra_info = {
+                        "short_code" : code,
+                    }
+
+                    
+                )
             if phone and background_tasks:
                 send_welcome_sms_background(
                     background_tasks=background_tasks,
@@ -125,7 +150,7 @@ async def register_tourist(
                     visitor_card_token=visitor_card_token,
                     event_name=event_data.get("name", "Event"),
                     valid_dates=valid_dates,
-                    user_id=user_id,
+                    short_code=code
                 )
         except Exception as e:
             print(f"Error generating visitor card token: {e}")
@@ -785,15 +810,111 @@ async def _get_or_generate_card_path(user_id: int, card_temp_path: str) -> str:
 
 
 # ------------------------------------------------------------
-# SERVE VISITOR CARD — temp-card file cache (Public Access)
+# SHORT URL RESOLVE — Get card URLs from short code
+# ------------------------------------------------------------
+@router.get("/short/{short_code}", status_code=status.HTTP_200_OK)
+async def resolve_short_url(short_code: str):
+    """
+    Resolve a short code to get visitor card URLs.
+    Frontend gets both preview and download URLs, then decides what to do.
+    
+    Response:
+    {
+      "short_code": "a7b2c9",
+      "user_id": 34,
+      "card_urls": {
+        "preview": "/tourists/visitor-card/{token}",
+        "download": "/tourists/visitor-card/{token}?download=true"
+      },
+      "token": "eyJhbGc..."
+    }
+    
+    Frontend can then:
+    - Open in browser: window.open(response.card_urls.preview)
+    - Download: window.open(response.card_urls.download)
+    - Or navigate: window.location.href = response.card_urls.preview
+    """
+    try:
+        # Query short_links table for the code
+        short_link_resp = (
+            supabaseAdmin.table("short_links")
+            .select("short_code, token")
+            .eq("short_code", short_code)
+            .single()
+            .execute()
+        )
+        
+        if not short_link_resp.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Short link not found"
+            )
+        
+        short_link = short_link_resp.data
+        token = short_link.get("token")
+        user_id = short_link.get("user_id")
+        
+        if not token:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Invalid short link: missing token"
+            )
+        
+        # Verify token is still valid (check expiry)
+        try:
+            payload = verify_file_token(token, expected_type="visitor_card")
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(
+                status_code=status.HTTP_410_GONE,
+                detail="Short link has expired"
+            )
+        except jwt.InvalidTokenError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Invalid token in short link"
+            )
+        
+        # Return both URLs so frontend can decide what to do
+        return {
+            "success": True,
+            "short_code": short_code,
+            "user_id": user_id,
+            "card_urls": {
+                "preview": f"/tourists/visitor-card/{token}",
+                "download": f"/tourists/visitor-card/{token}?download=true"
+            },
+            "token": token,
+            "created_at": short_link.get("created_at")
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error resolving short URL: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to resolve short link"
+        )
+
+
+# ------------------------------------------------------------
+# VISITOR CARD — temp-card file cache (Public Access)
+# Serve inline (view) by default, or download as attachment
 # ------------------------------------------------------------
 @router.get("/visitor-card/{token}", status_code=status.HTTP_200_OK)
-async def get_visitor_card(token: str):
+async def visitor_card(token: str, download: bool = Query(False, description="If true, download as attachment; else view inline")):
     """
-    Serve the visitor card PNG.
-    First request → generated fresh from DB and cached in static/temp-card/.
-    Subsequent requests within the TTL window → served directly from disk (no DB hit).
-    Cache is refreshed by touching the Redis last-access key on every hit.
+    Serve or download the visitor card PNG.
+    
+    Query Parameters:
+    - download: bool (default: False)
+        - False → serve inline with Cache-Control headers (view mode)
+        - True → serve as attachment with Content-Disposition header (download mode)
+    
+    Cache behavior:
+    - First request → generated fresh from DB and cached in static/temp-card/
+    - Subsequent requests within TTL → served from disk (no DB hit)
+    - Cache is refreshed by touching the Redis last-access key on every hit
     """
     try:
         payload = verify_file_token(token, expected_type="visitor_card")
@@ -804,14 +925,20 @@ async def get_visitor_card(token: str):
         # card_temp_path is baked into the token; fall back to default if old token
         card_temp_path = payload.get("card_temp_path") or f"{TEMP_CARD_DIR}/card_temp_{user_id}.png"
         path = await _get_or_generate_card_path(int(user_id), card_temp_path)
+        tourist_name = payload.get("user_name", f"tourist_{user_id}").replace(" ", "_")
+
+        # Build headers based on download flag
+        headers = {"Access-Control-Allow-Origin": "*"}
+        
+        if download:
+            headers["Content-Disposition"] = f"attachment; filename=visitor_card_{tourist_name}.png"
+        else:
+            headers["Cache-Control"] = "public, max-age=300"
 
         return FileResponse(
             path,
             media_type="image/png",
-            headers={
-                "Cache-Control": "public, max-age=300",
-                "Access-Control-Allow-Origin": "*",
-            },
+            headers=headers,
         )
 
     except jwt.ExpiredSignatureError:
@@ -824,48 +951,6 @@ async def get_visitor_card(token: str):
         raise
     except Exception as e:
         print(f"Error serving visitor card: {e}")
-        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to generate visitor card")
-
-
-# ------------------------------------------------------------
-# DOWNLOAD VISITOR CARD — temp-card file cache (Public Access)
-# ------------------------------------------------------------
-@router.get("/download-visitor-card/{token}", status_code=status.HTTP_200_OK)
-async def download_visitor_card(token: str):
-    """
-    Download the visitor card PNG.
-    Same cache logic as the serve endpoint — no duplicate DB queries if both
-    endpoints are hit in quick succession for the same user.
-    """
-    try:
-        payload = verify_file_token(token, expected_type="visitor_card")
-        user_id = payload.get("user_id")
-        if not user_id:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid token: missing user_id")
-
-        card_temp_path = payload.get("card_temp_path") or f"{TEMP_CARD_DIR}/card_temp_{user_id}.png"
-        path = await _get_or_generate_card_path(int(user_id), card_temp_path)
-        tourist_name = payload.get("user_name", f"tourist_{user_id}").replace(" ", "_")
-
-        return FileResponse(
-            path,
-            media_type="image/png",
-            headers={
-                "Content-Disposition": f"attachment; filename=visitor_card_{tourist_name}.png",
-                "Access-Control-Allow-Origin": "*",
-            },
-        )
-
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Token has expired")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Invalid token")
-    except ValueError as e:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, str(e))
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error downloading visitor card: {e}")
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Failed to generate visitor card")
 
 

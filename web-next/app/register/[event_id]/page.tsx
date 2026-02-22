@@ -214,11 +214,15 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
         <div className="space-y-2">
           <label className="text-sm font-medium text-gray-700">Phone</label>
           <input
-            type="phone"
+            type="tel"
             name="phone"
+            inputMode="numeric"
             maxLength={10}
             value={formData.phone}
-            onChange={handleInputChange}
+            onChange={(e) => {
+              const digits = e.target.value.replace(/\D/g, "");
+              setFormData({ ...formData, phone: digits });
+            }}
             className="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-yellow-200 focus:border-yellow-400"
             placeholder="Enter phone number"
           />

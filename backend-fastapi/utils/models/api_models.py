@@ -106,3 +106,28 @@ class EventFeedback(BaseModel):
     fingerprint: Optional[str] = None
     metadata: Optional[dict] = Field(default_factory=dict)
     submitted_at: Optional[datetime] = None
+
+
+# CREATE TABLE public.short_links (
+#   id BIGSERIAL PRIMARY KEY,
+#   short_code TEXT UNIQUE NOT NULL,
+
+#   -- store only JWT token
+#   token TEXT NOT NULL,
+
+#   created_at TIMESTAMPTZ DEFAULT NOW(),
+#   expires_at TIMESTAMPTZ,
+#   click_count INTEGER DEFAULT 0,
+
+#   is_active BOOLEAN DEFAULT TRUE
+# );
+
+
+class ShortLink(BaseModel):
+    id: Optional[int] = None
+    short_code: str
+    token: str
+    created_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    click_count: int = 0
+    is_active: bool = True

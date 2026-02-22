@@ -7,7 +7,14 @@ import os
 from datetime import datetime, timedelta
 from typing import Optional, Dict
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "linmar_secret_key")  # Use a secure secret key in production
+# Use a strong secret key (minimum 32 bytes for SHA256)
+# In production, this MUST be set via environment variable
+_default_secret = "your-super-secret-key-change-in-production-32-chars-min"
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", _default_secret)
+
+# Validate minimum key length for production
+if len(SECRET_KEY) < 32 and os.getenv("ENV") == "production":
+    raise ValueError("JWT_SECRET_KEY must be at least 32 bytes in production")
 
 def generate_file_token(
     file_path: str, 

@@ -34,7 +34,7 @@ class SMSConfig:
 class SMSHandler:
     def __init__(self):
         self.provider = SMSConfig.SMS_PROVIDER
-        self.base_url = os.getenv("BASE_URL", "http://localhost:8000")
+        self.base_url = os.getenv("BASE_URL", "http://localhost:3000")
         self.default_country_code = os.getenv("DEFAULT_COUNTRY_CODE", "+91")  # Default to India
     
     def format_phone_number(self, phone: str) -> str:
@@ -182,10 +182,9 @@ class SMSHandler:
         self,
         to_phone: str,
         user_name: str,
-        visitor_card_token: str,
         event_name: str = None,
         valid_dates: str = None,
-        user_id: int = None
+        short_code: str = None
     ) -> bool:
         """
         Send welcome SMS with visitor card link
@@ -203,7 +202,7 @@ class SMSHandler:
         """
         try:
             # Generate visitor card view/download link
-            card_view_url = f"{self.base_url}/sms/view-card?token={visitor_card_token}"
+            card_view_url = f"{self.base_url}/c/{short_code}"
             
             # Create short, concise message for SMS (160 char limit consideration)
             message = (
@@ -235,7 +234,7 @@ def send_welcome_sms_background(
     visitor_card_token: str,
     event_name: str = None,
     valid_dates: str = None,
-    user_id: int = None
+    short_code: str = None,
 ):
     """Send welcome SMS in background"""
     def send_sms():
@@ -247,7 +246,7 @@ def send_welcome_sms_background(
                 visitor_card_token=visitor_card_token,
                 event_name=event_name,
                 valid_dates=valid_dates,
-                user_id=user_id
+                short_code=short_code
             )
             if success:
                 logger.info(f"✅ Background SMS sent successfully to {to_phone}")

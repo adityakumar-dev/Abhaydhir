@@ -52,3 +52,41 @@ export async function getTouristById(user_id: number) {
   }
   return await res.json();
 }
+
+/* ── Public short code resolution (no auth) ── */
+
+export interface ShortCodeResponse {
+  success: boolean;
+  short_code: string;
+  user_id: number;
+  card_urls: {
+    preview: string;
+    download: string;
+  };
+  token: string;
+  created_at: string;
+}
+
+export async function resolveShortCode(shortCode: string): Promise<ShortCodeResponse> {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/tourists/short/${shortCode}`);
+  if (res.status === 404) throw new Error("Short code not found");
+  if (res.status === 410) throw new Error("Token expired - short link is no longer valid");
+  if (!res.ok) {
+    const error = await res.json().catch(() => null);
+    throw new Error(error?.detail || "Failed to resolve short code");
+  }
+  return await res.json();
+}
+
+/** Fetch visitor card image (or trigger download) */
+export async function getVisitorCard(token: string, download = false): Promise<Blob> {
+  const url = `${process.env.NEXT_PUBLIC_API_URL}/tourists/visitor-card/${token}${download ? "?download=true" : ""}`;
+  const res = await fetch(url);
+  if (res.status === 400) throw new Error("Invalid token format");
+  if (res.status === 403) throw new Error("Token expired or invalid");
+  if (res.status === 404) throw new Error("Card not found");
+  if (!res.ok) {
+    throw new Error("Failed to fetch visitor card");
+  }
+  return await res.blob();
+}

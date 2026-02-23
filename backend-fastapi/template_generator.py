@@ -267,4 +267,3 @@ class VisitorCardGenerator:
     # keep old name as alias
     def _generate_qr_code(self, data: str) -> Image.Image:
         return self._generate_qr(data, 380)
-

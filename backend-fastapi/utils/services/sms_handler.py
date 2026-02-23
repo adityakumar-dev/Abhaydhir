@@ -34,7 +34,7 @@ class SMSConfig:
 class SMSHandler:
     def __init__(self):
         self.provider = SMSConfig.SMS_PROVIDER
-        self.base_url = os.getenv("BASE_URL", "http://localhost:3000")
+        self.base_url = os.getenv("HOST_URL", "http://localhost:3000")
         self.default_country_code = os.getenv("DEFAULT_COUNTRY_CODE", "+91")  # Default to India
     
     def format_phone_number(self, phone: str) -> str:
@@ -231,7 +231,6 @@ def send_welcome_sms_background(
     background_tasks: BackgroundTasks,
     to_phone: str,
     user_name: str,
-    visitor_card_token: str,
     event_name: str = None,
     valid_dates: str = None,
     short_code: str = None,
@@ -243,7 +242,6 @@ def send_welcome_sms_background(
             success = sms_handler.send_welcome_sms(
                 to_phone=to_phone,
                 user_name=user_name,
-                visitor_card_token=visitor_card_token,
                 event_name=event_name,
                 valid_dates=valid_dates,
                 short_code=short_code

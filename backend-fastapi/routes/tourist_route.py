@@ -177,7 +177,6 @@ async def register_tourist(
                     background_tasks=background_tasks,
                     to_phone=phone,
                     user_name=registration.name,
-                    visitor_card_token=visitor_card_token,
                     event_name=event_data.get("name", "Event"),
                     valid_dates=valid_date,
                     short_code=code
@@ -200,7 +199,6 @@ async def register_tourist(
             "meta": meta_resp.data[0] if meta_resp.data else None,
             "visitor_card_url": card_public_url,
             "sms_sent": phone is not None,
-            "sms_view_url": f"/sms/view-card?token={visitor_card_token}" if visitor_card_token else None
         }
     except Exception as e:
         # Normalize exception text

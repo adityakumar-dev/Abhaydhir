@@ -135,10 +135,11 @@ def generate_card_token(
         "type": "visitor_card",
         "user_name": user_name,
         "event_name": event_name,
-        "valid_dates": valid_dates,
+        "valid_date": valid_dates,
         "card_temp_path": card_temp_path,
         "iat": datetime.utcnow(),
     }
+    print(f"Generating card token with payload: {payload}")
     if expires_in is not None:
         payload["exp"] = datetime.utcnow() + timedelta(seconds=expires_in)
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")

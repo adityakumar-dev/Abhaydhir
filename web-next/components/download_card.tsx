@@ -15,12 +15,10 @@ const DownloadCardPopup: React.FC<DownloadCardProps> = ({ cardPath, isOpen, onCl
 
   // cardPath is the preview URL: http://localhost:8000/tourists/visitor-card/{jwt_token}
   const previewUrl = cardPath;
-  // Get download URL: http://localhost:8000/tourists/download-visitor-card/{jwt_token}
-  const downloadUrl = cardPath.replace('/visitor-card/', '/download-visitor-card/');
 
   const handleDownload = () => {
     const link = document.createElement('a');
-    link.href = downloadUrl;
+    link.href = previewUrl + '?download=true'; // Append query param to trigger download
     link.target = '_blank';
     link.download = 'visitor_card.png';
     document.body.appendChild(link);
@@ -86,7 +84,7 @@ const DownloadCardPopup: React.FC<DownloadCardProps> = ({ cardPath, isOpen, onCl
         {process.env.NODE_ENV === 'development' && (
           <div className="mt-4 p-2 bg-gray-100 rounded text-xs text-left overflow-auto max-h-20">
             <p className="text-gray-600">Preview: {previewUrl}</p>
-            <p className="text-gray-600">Download: {downloadUrl}</p>
+            <p className="text-gray-600">Download: {previewUrl + '?download=true'}</p>
           </div>
         )}
       </div>

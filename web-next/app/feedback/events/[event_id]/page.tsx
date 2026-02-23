@@ -43,7 +43,6 @@ const _initDone = new Set<number>();
 /* ───────────────────────── Rating Config ───────────────────────── */
 
 interface RatingLevel {
-  label: string;
   emoji: string;
   color: string;
   bg: string;
@@ -55,7 +54,6 @@ interface RatingLevel {
 
 const ratingConfig: RatingLevel[] = [
   {
-    label: "Terrible",
     emoji: "😞",
     color: "from-red-500 to-red-600",
     bg: "bg-red-50",
@@ -65,7 +63,6 @@ const ratingConfig: RatingLevel[] = [
     particles: "#ef4444",
   },
   {
-    label: "Poor",
     emoji: "😕",
     color: "from-orange-500 to-orange-600",
     bg: "bg-orange-50",
@@ -75,7 +72,6 @@ const ratingConfig: RatingLevel[] = [
     particles: "#f97316",
   },
   {
-    label: "Okay",
     emoji: "😊",
     color: "from-yellow-500 to-yellow-600",
     bg: "bg-yellow-50",
@@ -85,7 +81,6 @@ const ratingConfig: RatingLevel[] = [
     particles: "#eab308",
   },
   {
-    label: "Good",
     emoji: "😄",
     color: "from-green-500 to-emerald-600",
     bg: "bg-green-50",
@@ -95,7 +90,6 @@ const ratingConfig: RatingLevel[] = [
     particles: "#22c55e",
   },
   {
-    label: "Amazing!",
     emoji: "🤩",
     color: "from-violet-500 to-purple-600",
     bg: "bg-purple-50",
@@ -156,7 +150,7 @@ function AnimatedStarRating({
               <span
                 className={`text-xs font-bold bg-gradient-to-r ${ratingConfig[active - 1]?.color} bg-clip-text text-transparent`}
               >
-                {ratingConfig[active - 1]?.label}
+               
               </span>
             </motion.div>
           )}

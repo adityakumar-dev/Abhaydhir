@@ -104,7 +104,7 @@ class VisitorCardGenerator:
                                 fn_detail, fill="#2c2c2c")
             text_y += 200
 
-        dates = user_data.get("valid_dates", "")
+        dates = user_data.get("valid_date", "")
         if dates:
             self._draw_centered(draw, f"Valid: {dates}", RECT_X1 + 150, text_y, text_w,
                                 fn_small, fill="#444444")

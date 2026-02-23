@@ -17,6 +17,8 @@ from utils.services.jwt_file_token import (
     verify_file_token,
     validate_file_path_security
 )
+from datetime import datetime
+
 from io import BytesIO
 from utils.services.card_cache import TEMP_CARD_DIR, touch_card, is_card_fresh
 import jwt
@@ -37,9 +39,23 @@ async def register_tourist(
     is_group: bool = Form(...),
     group_count: int = Form(...),
     registered_event_id: int = Form(...),
+    valid_date: str = Form(...),
     image: UploadFile = None,
+    
     background_tasks: BackgroundTasks = None,
 ):
+
+    print("Valid date : ", valid_date)
+    # change str based date to date object
+    if valid_date:
+        try:
+            valid_date = datetime.strptime(valid_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid date format for valid_date. Use YYYY-MM-DD.")
+    else:
+        # Set default valid_date if not provided
+        valid_date = datetime.strptime("2026-02-27", "%Y-%m-%d").date()
+    
     # Build registration object from form fields
     registration = Tourist(
         name=name,
@@ -48,7 +64,19 @@ async def register_tourist(
         unique_id=unique_id,
         is_group=is_group,
         group_count=group_count,
-        registered_event_id=registered_event_id
+        registered_event_id=registered_event_id,
+        valid_date=valid_date
+    )
+    # Build registration object from form fields
+    registration = Tourist(
+        name=name,
+        phone=phone,
+        unique_id_type=unique_id_type,
+        unique_id=unique_id,
+        is_group=is_group,
+        group_count=group_count,
+        registered_event_id=registered_event_id,
+        valid_date=valid_date
     )
     if hasattr(registration, "user_id"):
         delattr(registration, "user_id")
@@ -79,9 +107,15 @@ async def register_tourist(
     event_data = event_resp.data[0]
     
     # Insert tourist
-    try : 
+    try:
+        reg_dict = registration.dict()
+        # Convert valid_date to string if it's a date object
+        if isinstance(reg_dict.get("valid_date"), datetime):
+            reg_dict["valid_date"] = reg_dict["valid_date"].strftime("%Y-%m-%d")
+        elif hasattr(reg_dict.get("valid_date"), "isoformat"):
+            reg_dict["valid_date"] = reg_dict["valid_date"].isoformat()
 
-        insert_resp = supabaseAdmin.table("tourists").insert(registration.dict()).execute()
+        insert_resp = supabaseAdmin.table("tourists").insert(reg_dict).execute()
         if hasattr(insert_resp, "error") or not insert_resp.data:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Error registering: {insert_resp.error.message}")
         user_id = insert_resp.data[0]["user_id"]
@@ -98,10 +132,6 @@ async def register_tourist(
         if hasattr(meta_resp, 'error'):
             raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Error saving meta: {meta_resp.error.message}")
 
-        # Generate visitor card and send SMS in background
-        start = str(event_data.get("start_date", ""))[:10]
-        end = str(event_data.get("end_date", ""))[:10]
-        valid_dates = f"{start} to {end}"
         
         # Deterministic temp-card path — same user always maps to the same file
         card_temp_path = f"{TEMP_CARD_DIR}/card_temp_{user_id}.png"
@@ -113,7 +143,7 @@ async def register_tourist(
                 user_id=user_id,
                 user_name=registration.name,
                 event_name=event_data.get("name", ""),
-                valid_dates=valid_dates,
+                valid_dates=str(valid_date),
                 card_temp_path=card_temp_path,
             )
             #generate the short code 
@@ -135,7 +165,7 @@ async def register_tourist(
                     user_name= registration.name,
                     visitor_card_path = card_temp_path,
                     event_name = event_data.get("name", "Event"),
-                    valid_dates = valid_dates,
+                    valid_dates = valid_date,
                     extra_info = {
                         "short_code" : code,
                     }
@@ -149,7 +179,7 @@ async def register_tourist(
                     user_name=registration.name,
                     visitor_card_token=visitor_card_token,
                     event_name=event_data.get("name", "Event"),
-                    valid_dates=valid_dates,
+                    valid_dates=valid_date,
                     short_code=code
                 )
         except Exception as e:
@@ -747,7 +777,7 @@ async def get_user_image_token(
 
 
 # ─── Card cache helper ───────────────────────────────────────────────────────
-async def _get_or_generate_card_path(user_id: int, card_temp_path: str) -> str:
+async def _get_or_generate_card_path(user_id: int, card_temp_path: str, valid_date : str) -> str:
     """
     Return a valid path to the visitor card PNG, using a file cache under static/temp-card/.
 
@@ -784,15 +814,13 @@ async def _get_or_generate_card_path(user_id: int, card_temp_path: str) -> str:
     event_resp = supabaseAdmin.table("events").select("name, start_date, end_date").eq("event_id", event_id).single().execute()
     event = event_resp.data or {}
 
-    start = str(event.get("start_date", ""))[:10]
-    end   = str(event.get("end_date",   ""))[:10]
 
     card_data = {
         "name":               tourist.get("name", ""),
         "phone":              tourist.get("phone", ""),
         "profile_image_path": meta.get("image_path"),
         "qr_data":            meta.get("qr_code") or f"TOURIST-{user_id}",
-        "valid_dates":         f"{start} to {end}",
+        "valid_date":         valid_date,
         "group_count":         tourist.get("group_count", 1),
     }
 
@@ -919,12 +947,14 @@ async def visitor_card(token: str, download: bool = Query(False, description="If
     try:
         payload = verify_file_token(token, expected_type="visitor_card")
         user_id = payload.get("user_id")
+        valid_date = payload.get("valid_date", "")
+        print("Visitor card token payload:", payload)
         if not user_id:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid token: missing user_id")
 
         # card_temp_path is baked into the token; fall back to default if old token
         card_temp_path = payload.get("card_temp_path") or f"{TEMP_CARD_DIR}/card_temp_{user_id}.png"
-        path = await _get_or_generate_card_path(int(user_id), card_temp_path)
+        path = await _get_or_generate_card_path(int(user_id), card_temp_path, valid_date=valid_date)
         tourist_name = payload.get("user_name", f"tourist_{user_id}").replace(" ", "_")
 
         # Build headers based on download flag

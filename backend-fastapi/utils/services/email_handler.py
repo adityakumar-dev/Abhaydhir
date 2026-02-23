@@ -53,7 +53,7 @@ class InvitationEmailHandler:
                             <p>Welcome to Spring Festival! Your registration has been completed successfully.</p>
                             <p>Your visitor card is attached to this email.</p>
                             <p><b>Event:</b> {event_name or 'N/A'}</p>
-                            <p><b>Valid Dates:</b> {valid_dates or 'N/A'}</p>
+                            <p><b>Entry Valid Date:</b> {valid_dates or 'N/A'}</p>
                             <p>Important Information:</p>
                             <ul>
                                 <li>Your visitor card is your identity within the premises</li>

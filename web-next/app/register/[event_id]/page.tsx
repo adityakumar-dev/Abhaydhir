@@ -24,6 +24,7 @@ interface TouristRegistrationResponse {
     is_group: boolean;
     group_count: number;
     registered_event_id: number;
+    valid_date : string;
   };
   meta: {
     user_id: number;
@@ -56,14 +57,14 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
   }, [event_id]);
 
   const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
+    fullName: "",
     phone: "",
     unique_id_type: "aadhar",
     unique_id: "",
     is_group: false,
     group_count: 1,
     photo: null as File | null,
+    valid_date: "",
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -110,8 +111,12 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
         showToast("Please enter a valid ID number", "error");
         return;
       }
-      if (!formData.firstName) {
-        showToast("Please enter a valid first name", "error");
+      if (!formData.fullName) {
+        showToast("Please enter your full name", "error");
+        return;
+      }
+      if (!formData.valid_date) {
+        showToast("Please select your entry date", "error");
         return;
       }
       if (!formData.phone) {
@@ -126,15 +131,18 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
       //  setLoadingMessage("Validating registration details...");
       // Call API to register tourist
       const registrationPayload = {
-        name: `${formData.firstName} ${formData.lastName}`.trim(),
+        name: formData.fullName.trim(),
         phone: formData.phone,
         unique_id_type: formData.unique_id_type,
         unique_id: formData.unique_id,
         is_group: formData.is_group,
         group_count: formData.group_count,
         registered_event_id: event_id,
+        valid_date: formData.valid_date,
+
         photo: formData.photo as File,
       };
+      console.log("Submitting registration with payload:", registrationPayload);
       const parsedData = await api.registerTourist(registrationPayload);
       console.log("Registration response:", parsedData);
       console.log("Visitor card URL from backend:", parsedData.visitor_card_url);
@@ -185,30 +193,40 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
             A welcome sms with your visitor card url will be sent to your registered phone address.
           </p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
-              First Name
-            </label>
-            <input
-              name="firstName"
-              value={formData.firstName}
-              onChange={handleInputChange}
-              className="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-yellow-200 focus:border-yellow-400"
-              placeholder="Enter first name"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
-              Last Name
-            </label>
-            <input
-              name="lastName"
-              value={formData.lastName}
-              onChange={handleInputChange}
-              className="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-yellow-200 focus:border-yellow-400"
-              placeholder="Enter last name"
-            />
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-700">
+            Full Name
+          </label>
+          <input
+            name="fullName"
+            value={formData.fullName}
+            onChange={handleInputChange}
+            className="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-yellow-200 focus:border-yellow-400"
+            placeholder="Enter your full name"
+            autoComplete="name"
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-700">
+            Your Entry Date
+          </label>
+          <div className="flex gap-2">
+            {["2026-02-27", "2026-02-28", "2026-03-01"].map((date) => (
+              <button
+                key={date}
+                type="button"
+                className={`px-4 py-2 rounded-lg border transition-all font-semibold text-sm
+                  ${formData.valid_date === date
+                    ? "bg-yellow-500 text-white border-yellow-600 shadow"
+                    : "bg-white text-gray-700 border-gray-300 hover:bg-yellow-50"}
+                `}
+                onClick={() => setFormData({ ...formData, valid_date: date })}
+              >
+                {date === "2026-02-27" && "27 Feb"}
+                {date === "2026-02-28" && "28 Feb"}
+                {date === "2026-03-01" && "1 March"}
+              </button>
+            ))}
           </div>
         </div>
         <div className="space-y-2">

@@ -3,6 +3,7 @@ import { METHODS } from "http";
 import { useState } from "react";
 import axios from 'axios';
 import { redirect } from "next/dist/server/api-utils";
+import { format } from "path";
 export const API_BASE_URL =  process.env.NEXT_PUBLIC_API_URL!;
 // export const API_BASE_URL = 'https://api.vmsbutu.it.com' --- IGNORE ---
 export const url = API_BASE_URL;
@@ -50,12 +51,12 @@ export const api = {
     if (!visitorCardPath) return null;
     // Convert preview URL to download URL
     // /tourists/visitor-card/{token} -> /tourists/download-visitor-card/{token}
-    const downloadPath = visitorCardPath.replace('/visitor-card/', '/download-visitor-card/');
+    const downloadPath = `${API_BASE_URL}${visitorCardPath}?download=true`
     return `${API_BASE_URL}${downloadPath}`;
   },
   
   // Legacy method (keeping for backward compatibility)
-  base: (card: string) => `${API_BASE_URL}/users/download-visitor-card/?card_path=${encodeURIComponent(card)}`,
+  base: (card: string) => `${API_BASE_URL}/users/visitor-card/${card}?download=trie`,
   async createAppUser(data: CreateAppUser) {
     try {
       const formData = new FormData()
@@ -109,6 +110,7 @@ export const api = {
     is_group: boolean;
     group_count: number;
     registered_event_id: number;
+    valid_date: string;
     photo: File;
   }) {
     const formData = new FormData();
@@ -120,6 +122,7 @@ export const api = {
     formData.append("group_count", String(data.group_count));
     formData.append("registered_event_id", String(data.registered_event_id));
     formData.append("image", data.photo);
+    formData.append("valid_date", data.valid_date);
     try {
       const response = await fetch(`${API_BASE_URL}/tourists/register`, {
         method: 'POST',

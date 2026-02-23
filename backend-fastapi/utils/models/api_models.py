@@ -72,6 +72,7 @@ class Tourist(BaseModel):
     extra_info: Optional[dict] = Field(default_factory=dict)
     # created_at: Optional[datetime] = None
     phone : Optional[str] = None
+    valid_date : Optional[date] = None
 
 
 # CREATE TABLE public.event_feedback (

@@ -1,19 +1,18 @@
 
+
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { useMemo } from "react";
+import { useMemo, Suspense } from "react";
 
-// Dynamically import the VisitorCardPage from /c/[code]/page.tsx
 const VisitorCardPage = dynamic(() => import("./[code]/page"), { ssr: false });
 
-export default function VisitorCardQueryPage() {
+function VisitorCardQueryPageInner() {
 	const searchParams = useSearchParams();
 	const router = useRouter();
 	const code = useMemo(() => searchParams.get("id"), [searchParams]);
 
-	// If no code, show a fallback UI or redirect
 	if (!code) {
 		return (
 			<div className="min-h-screen flex items-center justify-center">
@@ -30,7 +29,13 @@ export default function VisitorCardQueryPage() {
 			</div>
 		);
 	}
-
-	// Render the VisitorCardPage with the extracted code
 	return <VisitorCardPage params={{ code }} />;
+}
+
+export default function VisitorCardQueryPage() {
+	return (
+		<Suspense fallback={<div className="min-h-screen flex items-center justify-center text-gray-500">Loading...</div>}>
+			<VisitorCardQueryPageInner />
+		</Suspense>
+	);
 }

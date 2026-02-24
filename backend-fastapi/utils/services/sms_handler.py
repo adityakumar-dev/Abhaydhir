@@ -5,7 +5,7 @@ import logging
 import os
 logger = logging.getLogger(__name__)
 enitity_id = os.getenv("E_ID", "")
-template_id = os.getenv("TEMPLATE_ID", "")
+template_id = os.getenv("T_ID", "")
 sender = os.getenv("SENDER", "")
 api_password = os.getenv("API_PASSWORD", "")
 class SMSHandler:

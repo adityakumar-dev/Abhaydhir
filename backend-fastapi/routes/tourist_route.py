@@ -175,7 +175,7 @@ async def register_tourist(
             if phone and background_tasks:
                 send_welcome_sms_background(
                     background_tasks=background_tasks,
-                    to_phone=phone,
+                    to=phone,
                     event_name="वसंतोत्सव 2026",
                     e_id=str(qr_code),
                     valid_date=valid_date,

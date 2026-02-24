@@ -66,6 +66,28 @@ export interface AdminFeedbackStatsPage {
   questions: PaginatedQuestion[];
 }
 
+// --- onboarding stats for event 1 ------------------------------------------------
+export interface OnboardingStats {
+  total_registered: number;
+  currently_inside: number;
+  feedback_submissions: number;
+  date_wise: {
+    registrations: Record<string, number>;
+    entries: Record<string, number>;
+  };
+}
+
+/** POST /admin/onboarding */
+export async function getAdminOnboardingStats(): Promise<OnboardingStats> {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_BASE_URL}/admin/onboarding`, { method: "POST", headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.detail ?? `Onboarding stats fetch failed (${res.status})`);
+  }
+  return res.json();
+}
+
 /* ── Auth helper ─────────────────────────────────────────────────── */
 
 async function authHeaders(): Promise<HeadersInit> {

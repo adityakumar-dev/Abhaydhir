@@ -156,29 +156,29 @@ async def register_tourist(
             }).execute()
             card_public_url = f"/tourists/visitor-card/{visitor_card_token}"
             
-            # also email for testing 
-            if True and background_tasks:
-                send_welcome_email_background(
-                    background_tasks=background_tasks,
+            # # also email for testing 
+            # if True and background_tasks:
+            #     send_welcome_email_background(
+            #         background_tasks=background_tasks,
                   
-                    user_email = os.getenv("TEST_WELCOME_EMAIL"),
-                    user_name= registration.name,
-                    visitor_card_path = card_temp_path,
-                    event_name = event_data.get("name", "Event"),
-                    valid_dates = valid_date,
-                    extra_info = {
-                        "short_code" : code,
-                    }
+            #         user_email = os.getenv("TEST_WELCOME_EMAIL"),
+            #         user_name= registration.name,
+            #         visitor_card_path = card_temp_path,
+            #         event_name = event_data.get("name", "Event"),
+            #         valid_dates = valid_date,
+            #         extra_info = {
+            #             "short_code" : code,
+            #         }
 
                     
-                )
+            #     )
             if phone and background_tasks:
                 send_welcome_sms_background(
                     background_tasks=background_tasks,
                     to_phone=phone,
-                    user_name=registration.name,
-                    event_name=event_data.get("name", "Event"),
-                    valid_dates=valid_date,
+                    event_name="वसंतोत्सव 2026",
+                    e_id=str(qr_code),
+                    valid_date=valid_date,
                     short_code=code
                 )
         except Exception as e:

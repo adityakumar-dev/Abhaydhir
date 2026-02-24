@@ -47,6 +47,7 @@ from routes.users_route import router as users_router
 from routes.entry_route import router as entry_router
 from routes.sms_route import router as sms_router
 from routes.feedback_route import router as feedback_router
+from routes.admin_route import router as admin_router
 from utils.services.public_access_link_provider import verify_public_access_link
 
 app.include_router(analytics_router, prefix="/analytics", tags=["analytics"])
@@ -56,6 +57,7 @@ app.include_router(users_router, prefix="/users", tags=["users"])
 app.include_router(entry_router, prefix="/entry", tags=["entries"])
 app.include_router(sms_router, prefix="/sms", tags=["sms"])
 app.include_router(feedback_router, prefix="/feedback", tags=["feedback"])
+app.include_router(admin_router, prefix="/admin", tags=["admin"])
 
 @app.get("/static/access")
 async def serve_signed_file(file: str, expires: int, sig: str):

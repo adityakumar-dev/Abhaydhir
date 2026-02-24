@@ -294,6 +294,13 @@ export default function AdminDashboard() {
           <div className="text-lg font-semibold mb-2">📊 Feedback Analytics</div>
           <div className="text-sm opacity-90">View responses &amp; export CSV</div>
         </button>
+        <button
+          className="bg-gray-600 text-white p-6 rounded-xl shadow-md hover:bg-gray-700 transition-colors"
+          onClick={() => router.push('/admin/1')}
+        >
+          <div className="text-lg font-semibold mb-2">🎫 Event‑1 Dashboard</div>
+          <div className="text-sm opacity-90">View live registration &amp; entry stats</div>
+        </button>
       </div>
     </div>
   );

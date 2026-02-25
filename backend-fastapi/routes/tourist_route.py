@@ -121,12 +121,13 @@ async def register_tourist(
         user_id = insert_resp.data[0]["user_id"]
 
         # QR + Image save
-        qr_code = f"TOURIST-{user_id}"
+        code = short_url_generator()
+        qr_code = code
         image_path = save_upload_file(image, prefix=f"tourist_{user_id}")
 
         meta_resp = supabaseAdmin.table("tourist_meta").insert({
             "user_id": user_id,
-            "qr_code": qr_code,
+            "qr_code": code,
             "image_path": image_path
         }).execute()
         if hasattr(meta_resp, 'error'):
@@ -147,7 +148,7 @@ async def register_tourist(
                 card_temp_path=card_temp_path,
             )
             #generate the short code 
-            code = short_url_generator()
+            
             # insert card token to supabase for short url generation and validation later
             supabaseAdmin.table('short_links').insert({
                 'short_code': code,
@@ -170,14 +171,13 @@ async def register_tourist(
             #             "short_code" : code,
             #         }
 
-                    
             #     )
             if phone and background_tasks:
                 send_welcome_sms_background(
                     background_tasks=background_tasks,
                     to=phone,
                     event_name="वसंतोत्सव 2026",
-                    e_id=str(qr_code),
+                    e_id=str(code),
                     valid_date=valid_date,
                     short_code=code
                 )

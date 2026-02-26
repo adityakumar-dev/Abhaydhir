@@ -3,4 +3,6 @@ backend-fastapi/.env
 backend-fastapi/.venv
 app-flutter/android/key.properties
 
-backend-fastapi/static
+backend-fastapi/static/*
+# Ignore all static generated files
+backend-fastapi/static/

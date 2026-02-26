@@ -12,7 +12,7 @@ from utils.supabase.auth import check_guard_admin_access
 router = APIRouter()
 
 import os 
-HOST_URL = os.getenv("HOST_URL", "http://localhost:8000")
+HOST_BACKEND_URL = os.getenv("HOST_BACKEND_URL", "http://localhost:8000")
 # ============================================================
 # GET TOURIST COMPLETE PROFILE
 # ============================================================
@@ -99,7 +99,10 @@ async def get_tourist_profile(
         
         print(f"Successfully retrieved profile for user_id: {user_id}")
         image_token = generate_user_image_token(tourist_data.get("image_path"), user_id, expires_in=86400 * 30)
-        image_url = f"{HOST_URL}/tourists/user-image/{image_token}"
+
+        image_url = f"{HOST_BACKEND_URL}/tourists/user-image/{image_token}"
+        id_token = generate_user_image_token(tourist_data.get("unique_id_path"), user_id, expires_in=86400 * 30)
+        id_url = f"{HOST_BACKEND_URL}/tourists/unique-id/{id_token}"
         return {
             "status": "success",
             "message": tourist_data.get("message"),
@@ -117,7 +120,7 @@ async def get_tourist_profile(
                 "created_at": tourist_data.get("created_at"),
                 "qr_code": tourist_data.get("qr_code"),
                 "image_path": image_url,
-                "unique_id_path": tourist_data.get("unique_id_path")
+                "unique_id_path": id_url
             },
             "today": {
                 "has_entry": tourist_data.get("has_entry_today"),
@@ -190,7 +193,11 @@ async def get_tourist_profile_by_phone(
         tourist_data = resp.data[0]
         
         print(f"Successfully retrieved profile for phone: {phone}, user_id: {user_id}")
-        
+        image_token = generate_user_image_token(tourist_data.get("image_path"), user_id, expires_in=86400 * 30)
+
+        image_url = f"{HOST_BACKEND_URL}/tourists/user-image/{image_token}"
+        id_token = generate_user_image_token(tourist_data.get("unique_id_path"), user_id, expires_in=86400 * 30)
+        id_url = f"{HOST_BACKEND_URL}/tourists/unique-id/{id_token}"
         return {
             "status": "success",
             "message": tourist_data.get("message"),
@@ -207,8 +214,8 @@ async def get_tourist_profile_by_phone(
                 "registered_event_id": tourist_data.get("registered_event_id"),
                 "created_at": tourist_data.get("created_at"),
                 "qr_code": tourist_data.get("qr_code"),
-                "image_path": tourist_data.get("image_path"),
-                "unique_id_path": tourist_data.get("unique_id_path")
+                "image_path": image_url,
+                "unique_id_path": id_url
             },
             "today": {
                 "has_entry": tourist_data.get("has_entry_today"),
@@ -325,7 +332,11 @@ async def get_tourist_complete_with_related(
         if isinstance(related_users, str):
             import json
             related_users = json.loads(related_users)
-        
+        image_token = generate_user_image_token(tourist_data.get("image_path"), user_id, expires_in=86400 * 30)
+
+        image_url = f"{HOST_BACKEND_URL}/tourists/user-image/{image_token}"
+        id_token = generate_user_image_token(tourist_data.get("unique_id_path"), user_id, expires_in=86400 * 30)
+        id_url = f"{HOST_BACKEND_URL}/tourists/unique-id/{id_token}"
         return {
             "status": "success",
             "message": tourist_data.get("message"),
@@ -342,8 +353,8 @@ async def get_tourist_complete_with_related(
                 "registered_event_id": tourist_data.get("registered_event_id"),
                 "created_at": tourist_data.get("created_at"),
                 "qr_code": tourist_data.get("qr_code"),
-                "image_path": tourist_data.get("image_path"),
-                "unique_id_path": tourist_data.get("unique_id_path"),
+                "image_path": image_url,
+                "unique_id_path": id_url,
                 "today": {
                     "has_entry": tourist_data.get("has_entry_today"),
                     "entry_record_id": tourist_data.get("entry_record_id"),

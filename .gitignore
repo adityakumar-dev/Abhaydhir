@@ -2,3 +2,5 @@ web-next/.env
 backend-fastapi/.env
 backend-fastapi/.venv
 app-flutter/android/key.properties
+
+backend-fastapi/static

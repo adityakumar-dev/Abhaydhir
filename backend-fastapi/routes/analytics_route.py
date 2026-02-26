@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from datetime import date
+from utils.india_time import india_today_str
 from utils.supabase.auth import check_guard_admin_access, jwt_middleware
 from utils.supabase.supabase import supabaseAdmin
 import logging
@@ -38,7 +38,7 @@ async def get_event_analytics(
     """
     try:
         # Use Python's local date (avoids Supabase UTC vs local timezone mismatch)
-        target_date = query_date or str(date.today())
+        target_date = query_date or india_today_str()
 
         # Validate date format
         try:

@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from utils.supabase.supabase import supabaseAdmin
 from utils.supabase.auth import jwt_middleware
 from datetime import datetime
+from utils.india_time import india_today_str
 router = APIRouter()
 
 EVENT_ID = 1
@@ -32,7 +33,7 @@ async def camera_dashboard(request: Request):
         _r_load_state, _r_get_hourly, _r_get_emotions, _r_get_returns, _redis_ok,
     )
 
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    today = india_today_str()
 
     # ── Camera status ─────────────────────────────────────────────────────────
     cameras = []

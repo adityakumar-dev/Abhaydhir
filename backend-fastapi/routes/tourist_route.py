@@ -18,6 +18,7 @@ from utils.services.jwt_file_token import (
     validate_file_path_security
 )
 from datetime import datetime
+from utils.india_time import india_today_str
 
 from io import BytesIO
 from utils.services.card_cache import TEMP_CARD_DIR, touch_card, is_card_fresh
@@ -218,7 +219,7 @@ async def get_all_tourists(
     Pass ?date=YYYY-MM-DD to view a specific date's tourists.
     """
     from datetime import date
-    today = str(date.today())
+    today = india_today_str()
     filter_date = date_filter or today
 
     if user.get("role") != "admin":
@@ -338,7 +339,7 @@ async def get_tourists_by_event(
     - "Currently inside" means: entered TODAY and no departure recorded TODAY
     """
     from datetime import date
-    today = str(date.today())
+    today = india_today_str()
     filter_date = date_filter or today
 
     # Fetch tourists for the event filtered by valid_date
@@ -575,7 +576,7 @@ async def get_tourist(user_id: int, user=Depends(jwt_middleware)):
     }
     """
     from datetime import date
-    today = str(date.today())
+    today = india_today_str()
 
     # Event dates for the festival — all possible dates a visitor could have
     EVENT_DATES = ["2026-02-27", "2026-02-28", "2026-03-01"]
@@ -702,7 +703,8 @@ async def get_user_image(token: str):
         # Security check: Ensure file is within allowed directories
         allowed_dirs = [
             "static/uploads",
-            "static/images"
+            "static/images",
+            "static/id_uploads",
         ]
         
         if not validate_file_path_security(file_path, allowed_dirs):

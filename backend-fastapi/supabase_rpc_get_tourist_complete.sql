@@ -3,12 +3,16 @@
 -- ============================================================
 -- Single comprehensive call to get all tourist data
 -- Includes: tourist profile, today's entries, historical entries
--- Input: user_id, event_id (optional)
+-- Input: user_id, event_id, p_date (pass from Python to avoid UTC mismatch)
 -- Output: Complete tourist record with entry history in one call
 
+DROP FUNCTION IF EXISTS get_tourist_complete(BIGINT, BIGINT);
+DROP FUNCTION IF EXISTS get_tourist_complete(BIGINT, BIGINT, DATE);
+
 CREATE OR REPLACE FUNCTION get_tourist_complete(
-  p_user_id BIGINT,
-  p_event_id BIGINT DEFAULT 1
+  p_user_id  BIGINT,
+  p_event_id BIGINT DEFAULT 1,
+  p_date     DATE   DEFAULT CURRENT_DATE  -- pass date from Python (date.today()) to avoid UTC mismatch
 )
 RETURNS TABLE (
   -- Tourist Profile
@@ -81,7 +85,7 @@ BEGIN
     LEFT JOIN public.entry_items ei ON ei.record_id = er.record_id
     WHERE er.user_id = p_user_id 
       AND er.event_id = p_event_id 
-      AND er.entry_date = CURRENT_DATE
+      AND er.entry_date = p_date
     GROUP BY er.record_id, er.entry_date
   ),
   today_items AS (
@@ -105,19 +109,19 @@ BEGIN
     LEFT JOIN public.entry_items ei ON ei.record_id = er.record_id
     WHERE er.user_id = p_user_id 
       AND er.event_id = p_event_id 
-      AND er.entry_date = CURRENT_DATE
+      AND er.entry_date = p_date
   ),
   history_records AS (
-    -- Get last 10 days of entry history
+    -- Get last 10 days of entry history (excluding today)
     SELECT
       jsonb_agg(
         jsonb_build_object(
-          'entry_date', er.entry_date,
-          'record_id', er.record_id,
+          'entry_date', sub.entry_date,
+          'record_id', sub.record_id,
           'entry_count', (
             SELECT COUNT(*)::INT 
             FROM public.entry_items ei 
-            WHERE ei.record_id = er.record_id
+            WHERE ei.record_id = sub.record_id
           ),
           'items', (
             SELECT jsonb_agg(
@@ -131,16 +135,20 @@ BEGIN
               ORDER BY ei.arrival_time ASC
             )
             FROM public.entry_items ei 
-            WHERE ei.record_id = er.record_id
+            WHERE ei.record_id = sub.record_id
           )
         )
-        ORDER BY er.entry_date DESC
+        ORDER BY sub.entry_date DESC
       ) as history
-    FROM public.entry_records er
-    WHERE er.user_id = p_user_id 
-      AND er.event_id = p_event_id 
-      AND er.entry_date < CURRENT_DATE
-    LIMIT 10
+    FROM (
+      SELECT er.record_id, er.entry_date
+      FROM public.entry_records er
+      WHERE er.user_id = p_user_id 
+        AND er.event_id = p_event_id 
+        AND er.entry_date <> p_date
+      ORDER BY er.entry_date DESC
+      LIMIT 10
+    ) sub
   )
   SELECT
     -- Tourist Profile
@@ -182,7 +190,7 @@ BEGIN
       ELSE 'No entries today'
     END as message
   FROM tourist_profile tp
-  LEFT JOIN today_record tr ON tr.record_id IS NOT NULL
+  LEFT JOIN today_record tr ON TRUE
   LEFT JOIN today_items ti ON TRUE
   LEFT JOIN history_records hr ON TRUE;
   
@@ -216,5 +224,5 @@ END;
 $$ LANGUAGE plpgsql STABLE;
 
 -- Grant permissions
-GRANT EXECUTE ON FUNCTION get_tourist_complete(BIGINT, BIGINT) TO authenticated;
-GRANT EXECUTE ON FUNCTION get_tourist_complete(BIGINT, BIGINT) TO anon;
+GRANT EXECUTE ON FUNCTION get_tourist_complete(BIGINT, BIGINT, DATE) TO authenticated;
+GRANT EXECUTE ON FUNCTION get_tourist_complete(BIGINT, BIGINT, DATE) TO anon;

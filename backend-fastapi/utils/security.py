@@ -1,5 +1,6 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 import secrets
+from utils.india_time import india_now
 from fastapi import HTTPException, Header
 from sqlalchemy.orm import Session
 import models
@@ -15,7 +16,7 @@ class SecurityHandler:
     def login_user(self, db: Session, app_user: models.AppUsers) -> dict:
         """Create a new API key on login"""
         api_key = self.generate_api_key()
-        expiry = datetime.utcnow() + timedelta(hours=self.API_KEY_EXPIRY_HOURS)
+        expiry = india_now() + timedelta(hours=self.API_KEY_EXPIRY_HOURS)
         
         # Update user's API key and expiry
         app_user.api_key = api_key
@@ -50,7 +51,7 @@ class SecurityHandler:
         if not app_user:
             raise HTTPException(status_code=401, detail="Invalid API key")
             
-        if not app_user.api_key_expiry or app_user.api_key_expiry < datetime.utcnow():
+        if not app_user.api_key_expiry or app_user.api_key_expiry < india_now():
             # Clear expired key
             app_user.api_key = None
             app_user.api_key_expiry = None

@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Request, Depends, Query
 from pydantic import BaseModel, Field, validator
 from typing import Optional, List
 from datetime import datetime, timedelta
+from utils.india_time import india_now
 from collections import defaultdict
 from utils.supabase.supabase import supabaseAdmin
 from utils.supabase.auth import jwt_middleware
@@ -42,7 +43,7 @@ def check_rate_limit(key: str, max_attempts: int = 3, window_minutes: int = 60) 
     if _use_redis and _redis_client:
         try:
             pipe = _redis_client.pipeline()
-            now_ms = int(datetime.utcnow().timestamp() * 1000)
+            now_ms = int(india_now().timestamp() * 1000)
             window_ms = window_minutes * 60 * 1000
             cutoff = now_ms - window_ms
 
@@ -60,7 +61,7 @@ def check_rate_limit(key: str, max_attempts: int = 3, window_minutes: int = 60) 
             # Fall through to memory fallback
 
     # In-memory fallback
-    now = datetime.utcnow()
+    now = india_now()
     window = timedelta(minutes=window_minutes)
     _memory_store[key] = [
         t for t in _memory_store.get(key, [])
@@ -229,7 +230,7 @@ async def submit_feedback(event_id: int, body: SubmitFeedbackRequest, request: R
             )
 
         # 4b. Device hash: same device cannot submit for same event within 24h
-        one_day_ago = (datetime.utcnow() - timedelta(hours=24)).isoformat()
+        one_day_ago = (india_now() - timedelta(hours=24)).isoformat()
         duplicate = (
             supabaseAdmin.table("feedback_sessions")
             .select("session_id")
@@ -250,7 +251,7 @@ async def submit_feedback(event_id: int, body: SubmitFeedbackRequest, request: R
             .insert({
                 "event_id": event_id,
                 "device_info": device_hash,
-                "submitted_at": datetime.utcnow().isoformat()
+                "submitted_at": india_now().isoformat()
             })
             .execute()
         )
@@ -266,7 +267,7 @@ async def submit_feedback(event_id: int, body: SubmitFeedbackRequest, request: R
                 "question_id": answer.question_id,
                 "answer_number": answer.answer_number,
                 "answer_text": answer.answer_text,
-                "answered_at": datetime.utcnow().isoformat()
+                "answered_at": india_now().isoformat()
             }
             for answer in body.answers
             if answer.question_id in questions_map
@@ -483,7 +484,7 @@ async def export_feedback_csv(
 
         output.seek(0)
         safe_name = event_name.replace(" ", "_")
-        filename  = f"feedback_{safe_name}_{datetime.utcnow().strftime('%Y%m%d')}.csv"
+        filename  = f"feedback_{safe_name}_{india_now().strftime('%Y%m%d')}.csv"
 
         return StreamingResponse(
             iter([output.getvalue()]),

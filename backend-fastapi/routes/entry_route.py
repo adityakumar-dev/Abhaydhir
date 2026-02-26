@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 from utils.supabase.supabase import supabaseAdmin
 from utils.supabase.auth import jwt_middleware, check_guard_admin_access
+from utils.india_time import india_today, india_today_str
 
 router = APIRouter()
 
@@ -41,7 +42,7 @@ async def create_entry(
     - Current inside status check
     - Entry history for today
     """
-    today = date.today()
+    today = india_today()
     
     print(f"Processing entry for short_code: {entry.short_code}, event_id: {entry.event_id}")
 
@@ -201,7 +202,7 @@ async def register_departure(
     - Finds the last entry_item for today without departure_time
     - Updates it with departure_time and calculates duration
     """
-    today = date.today()
+    today = india_today()
 
     print(f"Processing departure for short_code: {departure.short_code}, event_id: {departure.event_id}")
 
@@ -334,7 +335,7 @@ async def get_today_entries(
     """
     Get all entries for a user today, including open/closed status
     """
-    today = date.today()
+    today = india_today()
     
     # Get entry_record for today
     record_resp = supabaseAdmin.table("entry_records").select("*").eq("user_id", user_id).eq("event_id", event_id).eq("entry_date", str(today)).execute()

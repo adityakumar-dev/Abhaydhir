@@ -1,4 +1,4 @@
-from datetime import datetime
+from utils.india_time import india_now
 from PIL import Image, ImageDraw, ImageFont
 import os
 import qrcode
@@ -134,7 +134,7 @@ class VisitorCardGenerator:
         )
         os.makedirs(output_dir, exist_ok=True)
         name_slug = user_data.get("name", "card").replace(" ", "_")
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        ts = india_now().strftime("%Y%m%d_%H%M%S")
         out_path = os.path.join(output_dir, f"{name_slug}_card_{ts}.png")
         with open(out_path, "wb") as fh:
             fh.write(buf.read())
@@ -423,7 +423,7 @@ class VisitorCardGenerator3:
         )
         os.makedirs(output_dir, exist_ok=True)
         name_slug = user_data.get("name", "card").replace(" ", "_")
-        ts       = datetime.now().strftime("%Y%m%d_%H%M%S")
+        ts       = india_now().strftime("%Y%m%d_%H%M%S")
         out_path = os.path.join(output_dir, f"{name_slug}_card3_{ts}.png")
         with open(out_path, "wb") as fh:
             fh.write(buf.read())

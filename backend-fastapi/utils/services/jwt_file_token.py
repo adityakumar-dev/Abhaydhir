@@ -4,8 +4,9 @@ This module provides utilities to generate and verify JWT tokens for secure file
 """
 import jwt
 import os
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Optional, Dict
+from utils.india_time import india_now
 
 # Use a strong secret key (minimum 32 bytes for SHA256)
 # In production, this MUST be set via environment variable
@@ -43,14 +44,14 @@ def generate_file_token(
     """
     payload = {
         "file_path": file_path,
-        "iat": datetime.utcnow(),
+        "iat": india_now(),
         "type": token_type, 
         
     }
     
     # Only add expiration if expires_in is specified
     if expires_in is not None:
-        payload["exp"] = datetime.utcnow() + timedelta(seconds=expires_in)
+        payload["exp"] = india_now() + timedelta(seconds=expires_in)
     
     # Add any additional data to the payload
     if additional_data:
@@ -137,11 +138,11 @@ def generate_card_token(
         "event_name": event_name,
         "valid_date": valid_dates,
         "card_temp_path": card_temp_path,
-        "iat": datetime.utcnow(),
+        "iat": india_now(),
     }
     print(f"Generating card token with payload: {payload}")
     if expires_in is not None:
-        payload["exp"] = datetime.utcnow() + timedelta(seconds=expires_in)
+        payload["exp"] = india_now() + timedelta(seconds=expires_in)
     return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 
 

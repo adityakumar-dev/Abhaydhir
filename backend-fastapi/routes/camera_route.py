@@ -17,6 +17,7 @@ import os, json, base64, time, asyncio, logging
 from typing import Optional
 from datetime import datetime
 from collections import defaultdict, deque
+from utils.india_time import india_now, india_today_str
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Query
 from fastapi.responses import Response
@@ -157,7 +158,7 @@ def _upsert_capture(cam: str, track_id, **kw) -> dict:
         "image_b64":     None,
         "emotion":       None,
         "emotion_score": None,
-        "received_at":   datetime.utcnow().isoformat(),
+        "received_at":   india_now().isoformat(),
     })
     meta.update(kw)
     captures_index[cam][tid_str] = meta
@@ -368,7 +369,7 @@ async def get_hourly(
     cam:  Optional[str] = Query(None, description="Filter by cam ID"),
     date: Optional[str] = Query(None, description="YYYY-MM-DD, defaults to today"),
 ):
-    target = date or datetime.utcnow().strftime("%Y-%m-%d")
+    target = date or india_today_str()
     cam_list = [cam] if cam else list(KNOWN_CAM_IDS)
     result = []
     for c in cam_list:
@@ -383,7 +384,7 @@ async def get_emotions(
     cam:  str           = Query("exit-cam", description="Camera ID (exit-cam recommended)"),
     date: Optional[str] = Query(None, description="YYYY-MM-DD, defaults to today"),
 ):
-    target = date or datetime.utcnow().strftime("%Y-%m-%d")
+    target = date or india_today_str()
     counts = await asyncio.to_thread(_r_get_emotions, cam, target) if _redis_ok else dict(emotion_counts[cam].get(target, {}))
     return [{"emotion": e, "count": c} for e, c in sorted(counts.items(), key=lambda x: -x[1])]
 

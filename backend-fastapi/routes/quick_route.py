@@ -7,13 +7,14 @@ from datetime import date, datetime
 from pydantic import BaseModel
 from utils.services.jwt_file_token import generate_card_token
 from utils.services.card_cache import TEMP_CARD_DIR
+from utils.india_time import india_today
 import jwt
 
 router = APIRouter()
 
 class RenewCardRequest(BaseModel):
     short_code: str 
-    renew_date: date = date.today()
+    renew_date: date = None  # default handled in endpoint to ensure IST date
 
 
 # ────────────────────────────────────────────────────────────────────────────

@@ -4,10 +4,10 @@ Fetches: Profile, Today's entries, Historical entries in one RPC call
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from datetime import date
 from utils.services.jwt_file_token import generate_user_image_token
 from utils.supabase.supabase import supabaseAdmin
 from utils.supabase.auth import check_guard_admin_access
+from utils.india_time import india_today_str
 
 router = APIRouter()
 
@@ -77,8 +77,9 @@ async def get_tourist_profile(
         resp = supabaseAdmin.rpc(
             "get_tourist_complete",
             {
-                "p_user_id": user_id,
-                "p_event_id": event_id
+                "p_user_id":  user_id,
+                "p_event_id": event_id,
+                "p_date":     india_today_str(),
             }
         ).execute()
         
@@ -101,8 +102,11 @@ async def get_tourist_profile(
         image_token = generate_user_image_token(tourist_data.get("image_path"), user_id, expires_in=86400 * 30)
 
         image_url = f"{HOST_BACKEND_URL}/tourists/user-image/{image_token}"
-        id_token = generate_user_image_token(tourist_data.get("unique_id_path"), user_id, expires_in=86400 * 30)
-        id_url = f"{HOST_BACKEND_URL}/tourists/unique-id/{id_token}"
+        uid_path = tourist_data.get("unique_id_path")
+        id_url = None
+        if uid_path:
+            id_token = generate_user_image_token(uid_path, user_id, expires_in=86400 * 30)
+            id_url = f"{HOST_BACKEND_URL}/tourists/user-image/{id_token}"
         return {
             "status": "success",
             "message": tourist_data.get("message"),
@@ -179,8 +183,9 @@ async def get_tourist_profile_by_phone(
         resp = supabaseAdmin.rpc(
             "get_tourist_complete",
             {
-                "p_user_id": user_id,
-                "p_event_id": event_id
+                "p_user_id":  user_id,
+                "p_event_id": event_id,
+                "p_date":     str(date.today()),
             }
         ).execute()
         
@@ -196,8 +201,11 @@ async def get_tourist_profile_by_phone(
         image_token = generate_user_image_token(tourist_data.get("image_path"), user_id, expires_in=86400 * 30)
 
         image_url = f"{HOST_BACKEND_URL}/tourists/user-image/{image_token}"
-        id_token = generate_user_image_token(tourist_data.get("unique_id_path"), user_id, expires_in=86400 * 30)
-        id_url = f"{HOST_BACKEND_URL}/tourists/unique-id/{id_token}"
+        uid_path = tourist_data.get("unique_id_path")
+        id_url = None
+        if uid_path:
+            id_token = generate_user_image_token(uid_path, user_id, expires_in=86400 * 30)
+            id_url = f"{HOST_BACKEND_URL}/tourists/user-image/{id_token}"
         return {
             "status": "success",
             "message": tourist_data.get("message"),
@@ -304,8 +312,9 @@ async def get_tourist_complete_with_related(
         resp = supabaseAdmin.rpc(
             "get_tourist_with_related",
             {
-                "p_user_id": user_id,
-                "p_event_id": event_id
+                "p_user_id":  user_id,
+                "p_event_id": event_id,
+                "p_date":     str(date.today()),
             }
         ).execute()
         
@@ -335,8 +344,11 @@ async def get_tourist_complete_with_related(
         image_token = generate_user_image_token(tourist_data.get("image_path"), user_id, expires_in=86400 * 30)
 
         image_url = f"{HOST_BACKEND_URL}/tourists/user-image/{image_token}"
-        id_token = generate_user_image_token(tourist_data.get("unique_id_path"), user_id, expires_in=86400 * 30)
-        id_url = f"{HOST_BACKEND_URL}/tourists/unique-id/{id_token}"
+        uid_path = tourist_data.get("unique_id_path")
+        id_url = None
+        if uid_path:
+            id_token = generate_user_image_token(uid_path, user_id, expires_in=86400 * 30)
+            id_url = f"{HOST_BACKEND_URL}/tourists/user-image/{id_token}"
         return {
             "status": "success",
             "message": tourist_data.get("message"),

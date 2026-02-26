@@ -43,21 +43,26 @@ async def startup():
 from routes.analytics_route import router as analytics_router
 from routes.event_register import router as event_router
 from routes.tourist_route import router as tourist_router
+from routes.tourist_profile_route import router as tourist_profile_router
 from routes.users_route import router as users_router
 from routes.entry_route import router as entry_router
-from routes.sms_route import router as sms_router
 from routes.feedback_route import router as feedback_router
 from routes.admin_route import router as admin_router
+from routes.quick_route import router as quick_router
+from routes.camera_route import router as camera_router
 from utils.services.public_access_link_provider import verify_public_access_link
 
 app.include_router(analytics_router, prefix="/analytics", tags=["analytics"])
 app.include_router(event_router, prefix="/event", tags=["events"])
 app.include_router(tourist_router, prefix="/tourists", tags=["tourists"])
+app.include_router(tourist_profile_router, prefix="/profile", tags=["tourist-profile"])
 app.include_router(users_router, prefix="/users", tags=["users"])
 app.include_router(entry_router, prefix="/entry", tags=["entries"])
-app.include_router(sms_router, prefix="/sms", tags=["sms"])
 app.include_router(feedback_router, prefix="/feedback", tags=["feedback"])
 app.include_router(admin_router, prefix="/admin", tags=["admin"])
+app.include_router(quick_router, prefix="/quick", tags=["quick-renewal"])
+# Camera: no prefix — routes are /cam/stream (WS), /ws (WS), /api/* (REST)
+app.include_router(camera_router, tags=["camera"])
 
 @app.get("/static/access")
 async def serve_signed_file(file: str, expires: int, sig: str):

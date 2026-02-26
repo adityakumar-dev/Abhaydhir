@@ -8,10 +8,10 @@ import 'package:provider/provider.dart';
 import 'package:spring_admin/providers/camera_settings_provider.dart';
 import 'package:spring_admin/providers/event_provider.dart';
 import 'package:spring_admin/screens/camer_capture_screen.dart';
-import 'package:spring_admin/screens/event_selector_dialog.dart';
 import 'package:spring_admin/apis/server_api.dart';
 import 'package:spring_admin/utils/constants/server_endpoints.dart';
 import 'package:spring_admin/utils/event_required_mixin.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:open_file/open_file.dart';
 import 'package:http/http.dart' as http;
 
@@ -26,18 +26,18 @@ class QuickRegisterScreen extends StatefulWidget {
 class _QuickRegisterScreenState extends State<QuickRegisterScreen> with EventRequiredMixin {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _idController = TextEditingController();
-  final _groupNameController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _countController = TextEditingController();
-  String _selectedIdType = 'aadhar';
   String _registrationType = 'individual';
-  final List<String> _idTypes = [
-    'aadhar',
-    'passport',
-    'college_id',
-    'other',
+  String _selectedValidDate = '2026-02-27';
+  File? _uniqueIdPhotoFile;
+
+  static const List<Map<String, String>> _validDates = [
+    {'label': 'Feb 27', 'value': '2026-02-27'},
+    {'label': 'Feb 28', 'value': '2026-02-28'},
+    {'label': 'Mar 1',  'value': '2026-03-01'},
   ];
+
   bool isLoading = false;
   String? error;
   String? visitorCardUrl;
@@ -93,7 +93,6 @@ class _QuickRegisterScreenState extends State<QuickRegisterScreen> with EventReq
                 onTap: () {
                   setState(() {
                     _registrationType = 'individual';
-                    _groupNameController.clear();
                     _countController.clear();
                   });
                 },
@@ -205,56 +204,81 @@ class _QuickRegisterScreenState extends State<QuickRegisterScreen> with EventReq
     );
   }
 
-  Widget _buildIdTypeDropdown() {
+  Widget _buildValidDateSelector() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'ID Type',
+          'Valid Date',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
             color: Color(0xFF1A237E),
           ),
         ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.grey.shade50,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: DropdownButtonFormField<String>(
-            value: _selectedIdType,
-            isExpanded: true,
-            decoration: InputDecoration(
-              prefixIcon: const Icon(
-                Icons.badge_outlined,
-                color: Color.fromARGB(255, 10, 128, 120),
-              ),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-            ),
-            alignment: AlignmentDirectional.center,
-            items: _idTypes.map((String type) {
-              return DropdownMenuItem<String>(
-                value: type,
-                child: Text(
-                  type.replaceAll('_', ' ').toUpperCase(),
-                  style: TextStyle(color: Colors.grey.shade800),
-                  textAlign: TextAlign.center,
+        const SizedBox(height: 4),
+        Text(
+          'Select the date this registration is valid for',
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: _validDates.map((d) {
+            final isSelected = _selectedValidDate == d['value'];
+            return Padding(
+              padding: const EdgeInsets.only(right: 10),
+              child: GestureDetector(
+                onTap: () => setState(() => _selectedValidDate = d['value']!),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? const Color.fromARGB(255, 10, 128, 120)
+                        : Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isSelected
+                          ? const Color.fromARGB(255, 10, 128, 120)
+                          : Colors.grey.shade300,
+                      width: isSelected ? 2 : 1,
+                    ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: const Color.fromARGB(255, 10, 128, 120).withOpacity(0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            )
+                          ]
+                        : null,
+                  ),
+                  child: Text(
+                    d['label']!,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? Colors.white : Colors.grey.shade700,
+                    ),
+                  ),
                 ),
-              );
-            }).toList(),
-            onChanged: (String? newValue) {
-              setState(() {
-                _selectedIdType = newValue!;
-              });
-            },
-          ),
+              ),
+            );
+          }).toList(),
         ),
       ],
     );
+  }
+
+  Future<void> _pickIdPhoto() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 85,
+    );
+    if (pickedFile != null && mounted) {
+      setState(() => _uniqueIdPhotoFile = File(pickedFile.path));
+    }
   }
 
   @override
@@ -262,77 +286,57 @@ class _QuickRegisterScreenState extends State<QuickRegisterScreen> with EventReq
     final cameraProvider = Provider.of<CameraSettingsProvider>(context);
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
+      backgroundColor: const Color(0xFFF5F5F5),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(kToolbarHeight),
+        child: Container(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                Color(0xFFFFCCCB),
-                Color(0xFFF5F5F5),
-                Color(0xFFF5F5F5).withOpacity(0.1),
-              ],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
+              colors: [Color(0xFF00897B), Color(0xFF26A69A)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
             ),
           ),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF1A237E)),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Quick Register',
-          style: TextStyle(
-            color: Color(0xFF1A237E),
-            fontWeight: FontWeight.w600,
-            fontSize: 20,
-          ),
-        ),
-        actions: [
-          // IconButton(
-          //   icon: const Icon(Icons.event, color: Color(0xFF1A237E)),
-          //   onPressed: _showEventSelector,
-          //   tooltip: 'Select Event',
-          // ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          Positioned(
-            bottom: -190,
-            left: 150,
-            right: -150,
-            child: Container(
-              height: MediaQuery.of(context).size.height * 0.4,
-              child: Image.asset(
-                'assets/images/aipen.png',
-                height: MediaQuery.of(context).size.height * 0.4,
-                color: Color.fromARGB(255, 255, 165, 164),
+          child: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
+            title: const Text(
+              'Quick Register',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                fontSize: 20,
               ),
             ),
+            centerTitle: true,
           ),
-          SingleChildScrollView(
+        ),
+      ),
+      body: SingleChildScrollView(
             child: Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.shade200),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.06),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Form(
+                      ],
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Form(
                             key: _formKey,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -385,29 +389,14 @@ class _QuickRegisterScreenState extends State<QuickRegisterScreen> with EventReq
                                       ],
                                     ),
                                   ),
-                                Card(
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    side: BorderSide(
-                                      color: Colors.grey.shade200,
-                                    ),
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 16,
-                                      horizontal: 8,
-                                    ),
-                                    child: _buildPhotoSection(cameraProvider),
-                                  ),
-                                ),
-                                const SizedBox(height: 24),
+                                _buildPhotoRow(cameraProvider),
+                                const SizedBox(height: 16),
                                 _buildRegistrationTypeSelector(),
                                 const SizedBox(height: 16),
                                 _buildInputField(
                                   controller: _nameController,
                                   label: 'Full Name',
-                                  helperText: "Guest Name",
+                                  helperText: 'e.g. Rahul Sharma',
                                   icon: Icons.person_outline,
                                   validator: (value) {
                                     if (value == null || value.trim().isEmpty) {
@@ -418,65 +407,32 @@ class _QuickRegisterScreenState extends State<QuickRegisterScreen> with EventReq
                                 ),
                                 const SizedBox(height: 16),
                                 _buildInputField(
-                                  controller: _emailController,
-                                  label: 'Email Address',
-                                  helperText: "Guest Email Address",
-                                  icon: Icons.email_outlined,
-                                  keyboardType: TextInputType.emailAddress,
+                                  controller: _phoneController,
+                                  label: 'Phone Number',
+                                  helperText: 'e.g. 9876543210',
+                                  icon: Icons.phone_outlined,
+                                  keyboardType: TextInputType.phone,
                                   validator: (value) {
                                     if (value == null || value.trim().isEmpty) {
-                                      return 'Please enter email address';
-                                    }
-                                    if (!RegExp(
-                                      r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                                    ).hasMatch(value)) {
-                                      return 'Please enter a valid email address';
+                                      return 'Please enter phone number';
                                     }
                                     return null;
                                   },
                                 ),
                                 const SizedBox(height: 16),
-                                _buildIdTypeDropdown(),
-                                const SizedBox(height: 16),
-                                _buildInputField(
-                                  controller: _idController,
-                                  label: 'ID Number',
-                                  helperText: "Enter ID Number",
-                                  icon: Icons.credit_card,
-                                  keyboardType: TextInputType.text,
-                                  validator: (value) {
-                                    if (value == null || value.trim().isEmpty) {
-                                      return 'Please enter ID Number';
-                                    }
-                                    return null;
-                                  },
-                                ),
+                                _buildValidDateSelector(),
                                 if (_registrationType == 'group') ...[
                                   const SizedBox(height: 16),
                                   _buildInputField(
-                                    controller: _groupNameController,
-                                    label: 'Group Name',
-                                    helperText: "Enter Group Name",
-                                    icon: Icons.group,
-                                    validator: (value) {
-                                      if (_registrationType == 'group' && 
-                                          (value == null || value.trim().isEmpty)) {
-                                        return 'Please enter Group Name';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                  const SizedBox(height: 16),
-                                  _buildInputField(
                                     controller: _countController,
-                                    label: 'Count',
-                                    helperText: "Enter Count",
-                                    icon: Icons.numbers,
+                                    label: 'Group Count',
+                                    helperText: 'e.g. 5',
+                                    icon: Icons.groups_outlined,
                                     keyboardType: TextInputType.number,
                                     validator: (value) {
-                                      if (_registrationType == 'group' && 
+                                      if (_registrationType == 'group' &&
                                           (value == null || value.trim().isEmpty)) {
-                                        return 'Please enter Count';
+                                        return 'Please enter group count';
                                       }
                                       return null;
                                     },
@@ -487,8 +443,6 @@ class _QuickRegisterScreenState extends State<QuickRegisterScreen> with EventReq
                                 _buildSubmitButton(cameraProvider),
                               ],
                             ),
-                          ),
-                        ),
                       ),
                     ),
                   ),
@@ -496,103 +450,149 @@ class _QuickRegisterScreenState extends State<QuickRegisterScreen> with EventReq
               ],
             ),
           ),
-        ],
-      ),
     );
   }
 
-  Widget _buildPhotoSection(CameraSettingsProvider cameraProvider) {
+  Widget _buildPhotoRow(CameraSettingsProvider cameraProvider) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Photo',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF1a237e),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: Colors.grey.shade200),
-          ),
-          child: InkWell(
-            onTap: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const CameraCaptureScreen(),
-                ),
-              );
-              setState(() {});
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              height: 200,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                color: Colors.grey.shade50,
+        Row(
+          children: [
+            const Icon(Icons.photo_camera_outlined, size: 15, color: Color(0xFF1A237E)),
+            const SizedBox(width: 5),
+            const Text(
+              'Photos',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1A237E),
               ),
-              child:
-                  cameraProvider.capturedImage != null
-                      ? Stack(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.file(
-                              File(cameraProvider.capturedImage!.path),
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                              height: double.infinity,
-                            ),
-                          ),
-                          Positioned(
-                            top: 8,
-                            right: 8,
-                            child: IconButton(
-                              icon: const Icon(
-                                Icons.refresh,
-                                color: Colors.white,
-                              ),
-                              onPressed: () {
-                                cameraProvider.resetOverlay();
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder:
-                                        (context) =>
-                                            const CameraCaptureScreen(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      )
-                      : Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.camera_alt_outlined,
-                            size: 48,
-                            color: Colors.grey.shade400,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Tap to capture photo',
-                            style: TextStyle(
-                              color: Colors.grey.shade600,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
             ),
+            const SizedBox(width: 6),
+            Text('(optional)', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _buildPhotoTile(
+                label: 'Face Photo',
+                icon: Icons.face_outlined,
+                accentColor: const Color(0xFF00897B),
+                imageFile: cameraProvider.capturedImage != null
+                    ? File(cameraProvider.capturedImage!.path)
+                    : null,
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CameraCaptureScreen()),
+                  );
+                  setState(() {});
+                },
+                onClear: () {
+                  cameraProvider.resetOverlay();
+                  setState(() {});
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildPhotoTile(
+                label: 'ID Document',
+                icon: Icons.badge_outlined,
+                accentColor: const Color(0xFF00897B),
+                imageFile: _uniqueIdPhotoFile,
+                onTap: _pickIdPhoto,
+                onClear: () => setState(() => _uniqueIdPhotoFile = null),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPhotoTile({
+    required String label,
+    required IconData icon,
+    required Color accentColor,
+    required File? imageFile,
+    required VoidCallback onTap,
+    required VoidCallback onClear,
+  }) {
+    final hasImage = imageFile != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: accentColor,
+              ),
+            ),
+            if (hasImage) ...[
+              const Spacer(),
+              GestureDetector(
+                onTap: onClear,
+                child: const Icon(Icons.close, size: 14, color: Colors.redAccent),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 6),
+        GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            height: 140,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              color: hasImage ? null : accentColor.withOpacity(0.04),
+              border: Border.all(
+                color: hasImage ? accentColor : accentColor.withOpacity(0.25),
+                width: hasImage ? 2 : 1.5,
+              ),
+            ),
+            child: hasImage
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.file(
+                      imageFile,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
+                    ),
+                  )
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: accentColor.withOpacity(0.08),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(icon, size: 28, color: accentColor.withOpacity(0.7)),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Tap to add',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: accentColor.withOpacity(0.6),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
           ),
         ),
       ],
@@ -608,49 +608,51 @@ class _QuickRegisterScreenState extends State<QuickRegisterScreen> with EventReq
     String? Function(String?)? validator,
     String? helperText,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF1A237E),
-          ),
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      maxLength: maxLength,
+      style: const TextStyle(fontSize: 15),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(
+          color: Color(0xFF1A237E),
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
         ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          maxLength: maxLength,
-          decoration: InputDecoration(
-            prefixIcon: Icon(
-              icon,
-              color: const Color.fromARGB(255, 10, 128, 120),
-            ),
-            filled: true,
-            labelText: helperText,
-            labelStyle: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-            fillColor: Colors.grey.shade50,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade200),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Colors.grey.shade200),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Color.fromARGB(255, 10, 128, 120),
-              ),
-            ),
-          ),
-          validator: validator,
+        floatingLabelStyle: const TextStyle(
+          color: Color(0xFF00897B),
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
         ),
-      ],
+        hintText: helperText,
+        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+        prefixIcon: Icon(icon, color: const Color(0xFF00897B), size: 20),
+        filled: true,
+        fillColor: Colors.grey.shade50,
+        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade200),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey.shade200),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF00897B), width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.redAccent),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 2),
+        ),
+      ),
+      validator: validator,
     );
   }
 
@@ -666,34 +668,31 @@ class _QuickRegisterScreenState extends State<QuickRegisterScreen> with EventReq
 
   Widget _buildSubmitButton(CameraSettingsProvider cameraProvider) {
     return SizedBox(
-      height: 50,
-      child: ElevatedButton(
+      height: 52,
+      child: ElevatedButton.icon(
         onPressed: isLoading ? null : () => _handleSubmit(cameraProvider),
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color.fromARGB(255, 10, 128, 120),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          elevation: 2,
+          backgroundColor: const Color(0xFF00897B),
+          disabledBackgroundColor: Colors.grey.shade300,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          elevation: 3,
+          shadowColor: const Color(0xFF00897B).withOpacity(0.4),
         ),
-        child:
-            isLoading
-                ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                  ),
-                )
-                : const Text(
-                  'Register Guest',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
+        icon: isLoading
+            ? const SizedBox(
+                height: 18,
+                width: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
+              )
+            : const Icon(Icons.how_to_reg_rounded, size: 20),
+        label: Text(
+          isLoading ? 'Registering...' : 'Register Guest',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: 0.3),
+        ),
       ),
     );
   }
@@ -718,69 +717,122 @@ class _QuickRegisterScreenState extends State<QuickRegisterScreen> with EventReq
     });
 
     try {
-      if (cameraProvider.capturedImage == null) {
-        throw Exception('Please capture a photo');
-      }
-
       showLoadingDialog(context, "Registering Tourist...");
 
       // Use ServerApi to register tourist
       final result = await ServerApi.registerTourist(
         name: _nameController.text.trim(),
-        email: _emailController.text.trim(),
-        uniqueIdType: _selectedIdType,
-        uniqueId: _idController.text.trim(),
+        phone: _phoneController.text.trim(),
         isGroup: _registrationType == 'group',
-        groupCount: _registrationType == 'group' 
-            ? int.tryParse(_countController.text) ?? 1 
+        groupCount: _registrationType == 'group'
+            ? int.tryParse(_countController.text) ?? 1
             : 1,
         registeredEventId: registeredEventId!,
-        imageFile: File(cameraProvider.capturedImage!.path),
+        validDate: _selectedValidDate,
+        imageFile: cameraProvider.capturedImage != null
+            ? File(cameraProvider.capturedImage!.path)
+            : null,
+        uniqueIdPhotoFile: _uniqueIdPhotoFile,
       );
 
       if (!mounted) return;
       Navigator.pop(context); // Close loading dialog
 
-      if (result != null && result['message'] != null) {
+      if (result != null) {
         visitorCardUrl = result['visitor_card_url'];
-        
-        Fluttertoast.showToast(
-          msg: result['message'] ?? 'Tourist registered successfully!',
-          backgroundColor: Colors.green,
-          textColor: Colors.white,
-        );
-
-        // Show download dialog if visitor card is available
-        if (visitorCardUrl != null) {
-          _showVisitorCardDownloadDialog();
-        } else {
-          Navigator.pop(context);
-        }
-        
         cameraProvider.resetOverlay();
+        _showVisitorCardDownloadDialog();
       } else {
-        throw Exception('Failed to register tourist');
+        throw Exception('Registration failed. Please try again.');
       }
     } catch (e) {
       if (!mounted) return;
-      Navigator.pop(context); // Close loading dialog
-      
-      Fluttertoast.showToast(
-        msg: 'Error: ${e.toString()}',
-        backgroundColor: Colors.red,
-        textColor: Colors.white,
-      );
-      
-      setState(() {
-        error = e.toString();
-      });
+      // Close loading dialog if still showing
+      if (Navigator.canPop(context)) Navigator.pop(context);
+
+      // Extract clean message — strip "Exception: " prefix
+      String raw = e.toString();
+      if (raw.startsWith('Exception: ')) raw = raw.substring(11);
+
+      setState(() => error = raw);
+      _showErrorDialog(raw);
     } finally {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
+      if (mounted) setState(() => isLoading = false);
     }
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        contentPadding: EdgeInsets.zero,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Red header
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
+              decoration: const BoxDecoration(
+                color: Color(0xFFD32F2F),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.25),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.error_outline, color: Colors.white, size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Registration Failed',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Message body
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+              child: Text(
+                message,
+                style: const TextStyle(fontSize: 14, color: Color(0xFF333333), height: 1.5),
+              ),
+            ),
+            // Action
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00897B),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: const Text('OK, Fix & Retry', style: TextStyle(fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showVisitorCardDownloadDialog() {
@@ -895,7 +947,7 @@ class _QuickRegisterScreenState extends State<QuickRegisterScreen> with EventReq
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
-                                Icons.email_outlined,
+                                Icons.sms_outlined,
                                 color: Colors.blue.shade700,
                                 size: 20,
                               ),
@@ -903,7 +955,7 @@ class _QuickRegisterScreenState extends State<QuickRegisterScreen> with EventReq
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
-                                'Visitor card will be emailed to the tourist.',
+                                'Visitor card will be sent via SMS to the tourist.',
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
@@ -1058,9 +1110,7 @@ class _QuickRegisterScreenState extends State<QuickRegisterScreen> with EventReq
   @override
   void dispose() {
     _nameController.dispose();
-    _emailController.dispose();
-    _idController.dispose();
-    _groupNameController.dispose();
+    _phoneController.dispose();
     _countController.dispose();
     super.dispose();
   }

@@ -9,24 +9,8 @@ import hashlib
 import os
 import logging
 
-try:
-    import redis
-    _redis_client = redis.Redis(
-        host=os.getenv("REDIS_HOST", "localhost"),
-        port=int(os.getenv("REDIS_PORT", 6379)),
-        db=int(os.getenv("REDIS_DB", 0)),
-        password=os.getenv("REDIS_PASSWORD", None),
-        decode_responses=True,
-        socket_connect_timeout=2,
-        socket_timeout=2,
-    )
-    _redis_client.ping()
-    _use_redis = True
-    logging.info("[RateLimit] Redis connected at %s:%s", os.getenv("REDIS_HOST", "localhost"), os.getenv("REDIS_PORT", 6379))
-except Exception as _e:
-    _use_redis = False
-    _redis_client = None
-    logging.warning("[RateLimit] Redis unavailable (%s) — falling back to in-memory store", _e)
+# ─── Redis (shared client) ───────────────────────────────────────────────────
+from utils.services.redis_client import redis_client as _redis_client, redis_ok as _use_redis
 
 # Fallback in-memory store (single-process only)
 _memory_store: dict = {}

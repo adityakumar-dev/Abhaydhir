@@ -17,26 +17,8 @@ TEMP_CARD_DIR                 = "static/temp-card"
 CARD_TTL_SECONDS              = int(os.getenv("CARD_TEMP_TTL_SECONDS",          str(15 * 60)))
 CARD_CLEANUP_INTERVAL_SECONDS = int(os.getenv("CARD_CLEANUP_INTERVAL_SECONDS",  str(5  * 60)))
 
-# ─── Shared Redis client ───────────────────────────────────────────────────────
-try:
-    import redis as _redis_lib
-    card_redis: "_redis_lib.Redis | None" = _redis_lib.Redis(
-        host=os.getenv("REDIS_HOST", "localhost"),
-        port=int(os.getenv("REDIS_PORT", 6379)),
-        db=int(os.getenv("REDIS_DB", 0)),
-        password=os.getenv("REDIS_PASSWORD") or None,
-        decode_responses=True,
-        socket_connect_timeout=2,
-        socket_timeout=2,
-    )
-    card_redis.ping()
-    card_redis_ok = True
-    logging.info("[CardCache] Redis connected at %s:%s",
-                 os.getenv("REDIS_HOST", "localhost"), os.getenv("REDIS_PORT", 6379))
-except Exception as _ce:
-    card_redis    = None
-    card_redis_ok = False
-    logging.warning("[CardCache] Redis unavailable — falling back to mtime-only cleanup: %s", _ce)
+# ─── Redis (shared client — aliased for backward compat) ────────────────────
+from utils.services.redis_client import redis_client as card_redis, redis_ok as card_redis_ok
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────

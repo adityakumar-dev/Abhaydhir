@@ -2,7 +2,7 @@ import os
 from jose import jwt, JWTError
 from fastapi import Request, HTTPException, status, Depends
 from utils.supabase.supabase import supabaseAdmin
-from utils.supabase.auth_key import get_public_key, ISSUER
+from utils.supabase.auth_key import get_public_key, verify_with_legacy_secret, ISSUER
 # Load environment variables
 LEGACY_JWT_SECRET = os.getenv("LEGACY_JWT_SECRET")
 REGISTER_SECURITY_KEY = os.getenv("REGISTER_SECURITY_KEY")
@@ -25,16 +25,26 @@ async def jwt_middleware(request: Request) -> dict:
     token = auth_header.split(" ", 1)[1]
 
     try:
-        public_key = get_public_key(token)
-
-        payload = jwt.decode(
-            token,
-            public_key,
-            algorithms=["ES256"],   # ← REQUIRED for Supabase with ES256
-            audience="authenticated",
-            issuer=ISSUER,
-            options={"verify_aud": True}
-        )
+        # Primary: verify using Supabase ES256 public key from JWKS
+        try:
+            public_key = get_public_key(token)
+            payload = jwt.decode(
+                token,
+                public_key,
+                algorithms=["ES256"],
+                audience="authenticated",
+                issuer=ISSUER,
+                options={"verify_aud": True}
+            )
+        except Exception as jwks_err:
+            jwks_err_str = str(jwks_err)
+            # Only fall back to legacy if the failure is JWKS-related (network/fetch)
+            # Do NOT fall back for ExpiredSignatureError or invalid token errors
+            if any(kw in jwks_err_str.lower() for kw in ["failed to fetch", "jwks", "timed out", "no cached", "connection"]):
+                print(f"[WARN] JWKS unavailable, trying legacy secret fallback: {jwks_err_str}")
+                payload = verify_with_legacy_secret(token)
+            else:
+                raise
 
         print("Verified payload:", payload)
 

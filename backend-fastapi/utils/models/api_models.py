@@ -4,23 +4,24 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 class EntryItem(BaseModel):
+    """Single entry/exit record for a user on a specific date"""
     item_id: Optional[int] = None
     record_id: int
-    entry_point: str
     arrival_time: Optional[datetime] = None
     departure_time: Optional[datetime] = None
-    duration: Optional[str] = None  # ISO 8601 duration string or custom
-    entry_type: str = 'normal'  # Should match your enum
+    duration: Optional[str] = None  # PostgreSQL interval (e.g., "00:30:00")
+    entry_type: str  # Required: 'qr_code_scan', 'manual_entry', etc.
     bypass_reason: Optional[str] = None
     approved_by_uid: Optional[UUID] = None
     metadata: Optional[dict] = Field(default_factory=dict)
 
 class EntryRecord(BaseModel):
+    """Daily entry record per user per event - one record can have multiple entry_items"""
     record_id: Optional[int] = None
     user_id: int
     event_id: int
-    entry_date: Optional[date] = None
-    time_logs: List[Any] = Field(default_factory=list)
+    entry_date: date
+    time_logs: Optional[dict] = Field(default_factory=dict)  # JSONB for storing time-related data
     created_at: Optional[datetime] = None
 
 class Event(BaseModel):
@@ -59,12 +60,14 @@ class TouristMeta(BaseModel):
     image_path: Optional[str] = None
     extra_data: Optional[dict] = Field(default_factory=dict)
     created_at: Optional[datetime] = None
+    unique_id_path : Optional[str] = None
+    
 
 class Tourist(BaseModel):
     user_id: Optional[int] = None
     name: str
-    unique_id_type: str
-    unique_id: str
+    unique_id_type : Optional[str] = None
+    unique_id: Optional[str] = None
     is_student: bool = False
     is_group: bool = False
     group_count: int = 1
@@ -73,6 +76,7 @@ class Tourist(BaseModel):
     # created_at: Optional[datetime] = None
     phone : Optional[str] = None
     valid_date : Optional[date] = None
+    
 
 
 # CREATE TABLE public.event_feedback (

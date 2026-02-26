@@ -13,14 +13,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 
-import 'view_guest.dart';
+import '../guest_profile/guest_profile_detail.dart';
 
 // Define a Guest model for better type safety and performance
 class Guest {
   final int userId;
   final String uniqueId;
   final String name;
-  final String email;
+  final String phone;
+  final String validDate;
   final String uniqueIdType;
   final bool isGroup;
   final int groupCount;
@@ -35,7 +36,8 @@ class Guest {
     required this.userId,
     required this.uniqueId,
     required this.name,
-    required this.email,
+    required this.phone,
+    required this.validDate,
     required this.uniqueIdType,
     required this.isGroup,
     required this.groupCount,
@@ -55,9 +57,10 @@ class Guest {
       return Guest(
         userId: json['user_id'] as int,
         uniqueId: json['unique_id']?.toString() ?? '',
-        name: json['name']?.toString() ?? '',
-        email: json['email']?.toString() ?? '',
-        uniqueIdType: json['unique_id_type']?.toString() ?? '',
+        name: json['name']?.toString() ?? 'Unknown',
+        phone: json['phone']?.toString() ?? 'N/A',
+        validDate: json['valid_date']?.toString() ?? 'N/A',
+        uniqueIdType: json['unique_id_type']?.toString() ?? 'ID',
         isGroup: json['is_group'] ?? false,
         groupCount: json['group_count'] ?? 1,
         createdAt: json['created_at']?.toString() ?? '',
@@ -146,6 +149,14 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounceTimer;
 
+  // Fixed event dates
+  static const List<Map<String, String>> _availableDates = [
+    {'label': 'Feb 27', 'value': '2026-02-27'},
+    {'label': 'Feb 28', 'value': '2026-02-28'},
+    {'label': 'Mar 1',  'value': '2026-03-01'},
+  ];
+  String _selectedDate = '2026-02-27';
+
   @override
   void initState() {
     super.initState();
@@ -189,7 +200,7 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
       } else {
         filteredGuests = filtered.where((guest) {
           return guest.name.toLowerCase().contains(searchQuery.toLowerCase()) ||
-              guest.email.toLowerCase().contains(searchQuery.toLowerCase());
+              guest.phone.toLowerCase().contains(searchQuery.toLowerCase());
         }).toList();
       }
     });
@@ -217,7 +228,7 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
       });
 
       // Use ServerApi to get tourists by event
-      final result = await ServerApi.getTouristsByEvent(eventId);
+      final result = await ServerApi.getTouristsByEvent(eventId, date: _selectedDate);
 
       if (!mounted) return;
 
@@ -273,19 +284,15 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF5F5F5),
       appBar: PreferredSize(
-        preferredSize: Size.fromHeight(kToolbarHeight),
+        preferredSize: const Size.fromHeight(kToolbarHeight),
         child: Container(
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                Color(0xFFFFCCCB),
-                Color(0xFFF5F5F5),
-                Color(0xFFF5F5F5).withOpacity(0.1)
-              ],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
+              colors: [Color(0xFF00897B), Color(0xFF26A69A)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
             ),
           ),
           child: AppBar(
@@ -293,21 +300,21 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
             backgroundColor: Colors.transparent,
             elevation: 0,
             leading: IconButton(
-              icon: Icon(Icons.arrow_back_ios, 
-                color: Color(0xFF1A237E)),
+              icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
               onPressed: () => Navigator.pop(context),
             ),
-            title: Text(
+            title: const Text(
               'Guest List',
               style: TextStyle(
-                color: Color(0xFF1A237E),
-                fontWeight: FontWeight.w600,
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
                 fontSize: 20,
               ),
             ),
+            centerTitle: true,
             actions: [
               IconButton(
-                icon: Icon(Icons.download, color: Color(0xFF1A237E)),
+                icon: const Icon(Icons.download, color: Colors.white),
                 tooltip: 'Download Entry Data',
                 onPressed: _showDownloadDialog,
               ),
@@ -319,19 +326,6 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Positioned(
-              bottom: -190,
-              left: 150,
-              right: -150,
-              child: Container(
-                height: MediaQuery.of(context).size.height * 0.4,
-                child: Image.asset(
-                  'assets/images/aipen.png',
-                  height: MediaQuery.of(context).size.height * 0.4,
-                  color: Color.fromARGB(255, 255, 165, 164),
-                ),
-              ),
-            ),
             RefreshIndicator(
               onRefresh: fetchGuests,
               child: Column(
@@ -341,6 +335,7 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
                         children: [
                           // _buildHeaderCard(),
                           _buildStatistics(),
+                          _buildDateSelector(),
                           Padding(
                             padding: const EdgeInsets.all(16),
                             child: TextField(
@@ -471,6 +466,43 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
     );
   }
 
+  Widget _buildDateSelector() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Row(
+        children: _availableDates.map((d) {
+          final isSelected = _selectedDate == d['value'];
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Text(d['label']!),
+              selected: isSelected,
+              onSelected: (_) {
+                if (_selectedDate != d['value']!) {
+                  setState(() => _selectedDate = d['value']!);
+                  fetchGuests();
+                }
+              },
+              selectedColor: const Color(0xFF1A237E),
+              backgroundColor: Colors.white,
+              labelStyle: TextStyle(
+                color: isSelected ? Colors.white : const Color(0xFF1A237E),
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+              side: BorderSide(
+                color: const Color(0xFF1A237E).withOpacity(0.4),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   Widget _buildStatistics() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -587,189 +619,276 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
   }
 
   Widget _buildGuestCard(Guest guest) {
-    return Card(
-      elevation: 0,
+    final statusColor = guest.isCurrentlyInside ? Colors.green : Colors.grey[400];
+    
+    return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      shape: RoundedRectangleBorder(
+      decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
+        border: Border.all(
           color: guest.isCurrentlyInside 
-              ? Colors.green.withOpacity(0.3)
+              ? Colors.green.withOpacity(0.5)
               : Colors.grey.withOpacity(0.2),
           width: guest.isCurrentlyInside ? 2 : 1,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        leading: CircleAvatar(
-          backgroundColor: const Color(0xFF1A237E).withOpacity(0.1),
-          child: const Icon(
-            Icons.person_outline,
-            color: Color(0xFF1A237E),
-          ),
-        ),
-        title: Text(
-          guest.name,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1A237E),
-          ),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              guest.email,
-              style: TextStyle(color: Colors.grey[600]),
-            ),
-            if (guest.isGroup) Text(
-              'Group: ${guest.groupCount} members',
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 12,
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => GuestProfileDetail(
+                userId: guest.userId,
+                guestName: guest.name,
               ),
             ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    guest.uniqueIdType.toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.blue,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Created: ${_formatDate(guest.createdAt)}',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                if (guest.isCurrentlyInside)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.circle,
-                          size: 8,
-                          color: Colors.green,
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          'Currently Inside',
-                          style: TextStyle(
-                            color: Colors.green,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                if (guest.hasEntryToday && !guest.isCurrentlyInside)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.exit_to_app,
-                          size: 12,
-                          color: Colors.orange,
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          'Has Exited',
-                          style: TextStyle(
-                            color: Colors.orange,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                if (guest.totalEntriesToday > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${guest.totalEntriesToday} ${guest.totalEntriesToday == 1 ? 'entry' : 'entries'} today',
-                      style: const TextStyle(
-                        color: Colors.blue,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ],
-        ),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-        onTap: () {
-          Navigator.pushNamed(
-            context,
-            ViewGuestScreen.routeName,
-            arguments: {
-              'userId': guest.userId.toString(),
-            },
           );
         },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header: Name and Status Badge
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          guest.name,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1A237E),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        // const SizedBox(height: 4),
+                        // Row(
+                        //   children: [
+                        //     Icon(
+                        //       Icons.phone,
+                        //       size: 14,
+                        //       color: Colors.grey[600],
+                        //     ),
+                        //     const SizedBox(width: 4),
+                        //     Text(
+                        //       guest.phone,
+                        //       style: TextStyle(
+                        //         fontSize: 13,
+                        //         color: Colors.grey[600],
+                        //         fontWeight: FontWeight.w500,
+                        //       ),
+                        //     ),
+                        //   ],
+                        // ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Status indicator
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: statusColor?.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: statusColor?.withOpacity(0.3) ?? Colors.grey.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: statusColor,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          guest.isCurrentlyInside ? 'Inside' : 'Outside',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: statusColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              
+              // Phone and Valid Till Row
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Phone',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.phone,
+                              size: 14,
+                              color: Colors.teal[700],
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              guest.phone,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF00897B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        'Valid Till',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        guest.validDate,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              
+              // Entry Stats and Group Info
+              Row(
+                children: [
+                  if (guest.isGroup)
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.groups,
+                              size: 14,
+                              color: Colors.purple,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${guest.groupCount} members',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.purple,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.person,
+                              size: 14,
+                              color: Colors.orange,
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'Individual',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.orange,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  const SizedBox(width: 8),
+                  if (guest.totalEntriesToday > 0)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.teal.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '${guest.totalEntriesToday} ${guest.totalEntriesToday == 1 ? 'entry' : 'entries'}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF00897B),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  String _formatDate(String? dateStr) {
-    if (dateStr == null) return 'N/A';
-    try {
-      final date = DateTime.parse(dateStr);
-      return '${date.day}/${date.month}/${date.year}';
-    } catch (e) {
-      return dateStr;
-    }
-  }
 
-  /// Show download dialog with date range picker
   void _showDownloadDialog() async {
     final eventId = getEventId(context);
     if (eventId == null) {

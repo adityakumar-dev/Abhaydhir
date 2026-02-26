@@ -105,8 +105,9 @@ export const api = {
   async registerTourist(data: {
     name: string;
     phone: string;
-    unique_id_type: string;
-    unique_id: string;
+    unique_id_type?: string;
+    unique_id?: string;
+    unique_id_photo?: File;
     is_group: boolean;
     group_count: number;
     registered_event_id: number;
@@ -116,8 +117,15 @@ export const api = {
     const formData = new FormData();
     formData.append("name", data.name);
     formData.append("phone", data.phone);
-    formData.append("unique_id_type", data.unique_id_type);
-    formData.append("unique_id", data.unique_id);
+    if (data.unique_id_type) {
+      formData.append("unique_id_type", data.unique_id_type);
+    }
+    if (data.unique_id) {
+      formData.append("unique_id", data.unique_id);
+    }
+    if (data.unique_id_photo) {
+      formData.append("unique_id_photo", data.unique_id_photo);
+    }
     formData.append("is_group", String(data.is_group));
     formData.append("group_count", String(data.group_count));
     formData.append("registered_event_id", String(data.registered_event_id));
@@ -132,8 +140,33 @@ export const api = {
         // },
       });
       if (!response.ok) {
-        const error = await response.json().catch(() => null);
-        throw new Error(error?.detail || error?.message || 'Registration failed');
+        const errorText = await response.text().catch(() => "");
+        let errorMessage = "Registration failed";
+
+        try {
+          const errorJson = errorText ? JSON.parse(errorText) : null;
+          if (Array.isArray(errorJson)) {
+            errorMessage = errorJson
+              .map((item) => item?.message || item?.detail || JSON.stringify(item))
+              .join(", ");
+          } else if (Array.isArray(errorJson?.detail)) {
+            errorMessage = errorJson.detail
+              .map((item: any) => item?.msg || item?.message || JSON.stringify(item))
+              .join(", ");
+          } else if (typeof errorJson?.detail === "string") {
+            errorMessage = errorJson.detail;
+          } else if (typeof errorJson?.message === "string") {
+            errorMessage = errorJson.message;
+          } else if (errorJson) {
+            errorMessage = JSON.stringify(errorJson);
+          }
+        } catch {
+          if (errorText) {
+            errorMessage = errorText;
+          }
+        }
+
+        throw new Error(errorMessage);
       }
       return await response.json();
     } catch (error) {

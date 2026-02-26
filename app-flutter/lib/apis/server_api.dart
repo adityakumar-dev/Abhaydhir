@@ -197,13 +197,13 @@ class ServerApi {
   /// Register tourist (Public - no auth required)
   static Future<Map<String, dynamic>?> registerTourist({
     required String name,
-    String? email,
-    required String uniqueIdType,
-    required String uniqueId,
+    required String phone,
     required bool isGroup,
     required int groupCount,
     required int registeredEventId,
-    required File imageFile,
+    required String validDate,
+    File? imageFile,
+    File? uniqueIdPhotoFile,
   }) async {
     try {
       var request = http.MultipartRequest(
@@ -213,33 +213,49 @@ class ServerApi {
 
       // Add form fields
       request.fields['name'] = name;
-      if (email != null && email.isNotEmpty) {
-        request.fields['email'] = email;
-      }
-      request.fields['unique_id_type'] = uniqueIdType;
-      request.fields['unique_id'] = uniqueId;
+      request.fields['phone'] = phone;
       request.fields['is_group'] = isGroup.toString();
       request.fields['group_count'] = groupCount.toString();
       request.fields['registered_event_id'] = registeredEventId.toString();
+      request.fields['valid_date'] = validDate;
 
-      // Add image file
-      request.files.add(
-        await http.MultipartFile.fromPath('image', imageFile.path),
-      );
+      // Add face image (optional)
+      if (imageFile != null) {
+        request.files.add(
+          await http.MultipartFile.fromPath('image', imageFile.path),
+        );
+      }
 
-      // Send request
+      // Add unique ID photo (optional)
+      if (uniqueIdPhotoFile != null) {
+        request.files.add(
+          await http.MultipartFile.fromPath('unique_id_photo', uniqueIdPhotoFile.path),
+        );
+      }
+
+      // Send request (no auth required for tourist registration)
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 201) {
         return json.decode(response.body) as Map<String, dynamic>;
       } else {
+        // Parse the backend error detail and throw so caller can display it
+        String errorMsg = 'Registration failed';
+        try {
+          final body = json.decode(response.body);
+          if (body is Map) {
+            errorMsg = body['detail']?.toString() ??
+                body['message']?.toString() ??
+                errorMsg;
+          }
+        } catch (_) {}
         _handleError('registerTourist', response.body);
-        return null;
+        throw Exception(errorMsg);
       }
     } catch (e) {
       _handleError('registerTourist', e);
-      return null;
+      rethrow;
     }
   }
 
@@ -269,6 +285,7 @@ class ServerApi {
   /// Get tourists by event (Admin/Security)
   static Future<Map<String, dynamic>?> getTouristsByEvent(
     int eventId, {
+    String? date,
     int limit = 20,
     int offset = 0,
   }) async {
@@ -276,6 +293,7 @@ class ServerApi {
       final response = await http.get(
         Uri.parse(ServerEndpoints.getTouristsByEvent(
           eventId,
+          date: date,
           limit: limit,
           offset: offset,
         )),
@@ -470,6 +488,42 @@ class ServerApi {
     }
   }
 
+  /// Create entry using short code (QR Code text value)
+  static Future<Map<String, dynamic>?> createEntryWithCode({
+    required String shortCode,
+    required int eventId,
+  }) async {
+    try {
+      final body = {
+        'short_code': shortCode,
+        'event_id': eventId,
+      };
+
+      final response = await http.post(
+        Uri.parse(ServerEndpoints.createEntry()),
+        headers: await _buildHeaders(),
+        body: json.encode(body),
+      );
+
+      if (response.statusCode == 201) {
+        return json.decode(response.body) as Map<String, dynamic>;
+      } else {
+        String errorMsg = 'Entry failed';
+        try {
+          final body = json.decode(response.body);
+          if (body is Map) {
+            errorMsg = body['detail']?.toString() ?? body['message']?.toString() ?? errorMsg;
+          }
+        } catch (_) {}
+        _handleError('createEntryWithCode', response.body);
+        throw Exception(errorMsg);
+      }
+    } catch (e) {
+      _handleError('createEntryWithCode', e);
+      rethrow;
+    }
+  }
+
   /// Register departure (Admin/Security)
   static Future<Map<String, dynamic>?> registerDeparture({
     required int userId,
@@ -569,27 +623,51 @@ class ServerApi {
   // ============================================================
   // ANALYTICS API
   // ============================================================
+  // COMPREHENSIVE ANALYTICS
+  // ============================================================
 
-  /// Get comprehensive event analytics for security
-  static Future<Map<String, dynamic>?> getEventAnalytics(int eventId) async {
+  /// Get comprehensive event analytics in a single RPC call
+  /// Returns: event_info, crowd_status, today_summary, last_hour, entry_type_breakdown,
+  /// hourly_distribution, recent_entries, alerts, registrations_summary
+  static Future<Map<String, dynamic>?> getEventAnalytics(int eventId, {String? queryDate}) async {
     try {
-      debugPrint('Fetching analytics for event: $eventId');
+      debugPrint('━━━ Fetching comprehensive analytics for event: $eventId ━━━');
       
       final headers = await _buildHeaders(requiresAuth: true);
-      final url = Uri.parse('${ServerEndpoints.baseUrl}/analytics/event/$eventId/security-analytics');
       
-      final response = await http.get(url, headers: headers);
+      // Build URL with optional query date
+      String url = '${ServerEndpoints.baseUrl}/analytics/event/$eventId';
+      if (queryDate != null && queryDate.isNotEmpty) {
+        url += '?query_date=$queryDate';
+      }
+      
+      final response = await http.get(Uri.parse(url), headers: headers);
+      
+      debugPrint('Analytics request status: ${response.statusCode}');
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        debugPrint('Analytics data received successfully');
+        
+        debugPrint('✅ Analytics data received successfully');
+        debugPrint('📊 Event Info: ${data['event_info']}');
+        debugPrint('👥 Crowd Status: ${data['crowd_status']}');
+        debugPrint('📈 Today Summary: ${data['today_summary']}');
+        debugPrint('⏰ Last Hour: ${data['last_hour']}');
+        debugPrint('📋 Entry Type Breakdown: ${data['entry_type_breakdown']}');
+        debugPrint('📊 Hourly Distribution: ${data['hourly_distribution']}');
+        debugPrint('👤 Recent Entries: ${data['recent_entries']}');
+        debugPrint('⚠️ Alerts: ${data['alerts']}');
+        debugPrint('📊 Registrations Summary: ${data['registrations_summary']}');
+        
         return data;
       } else {
-        debugPrint('Failed to fetch analytics: ${response.statusCode}');
-        debugPrint('Response: ${response.body}');
+        debugPrint('❌ Failed to fetch analytics: ${response.statusCode}');
+        debugPrint('Response body: ${response.body}');
         return null;
       }
     } catch (e) {
+      logger.e('Error fetching analytics: $e');
+      debugPrint('❌ Analytics error: $e');
       _handleError('getEventAnalytics', e);
       return null;
     }
@@ -669,6 +747,249 @@ class ServerApi {
       await Supabase.instance.client.auth.signOut();
     } catch (e) {
       _handleError('logout', e);
+    }
+  }
+
+  // ============================================================
+  // RENEW CARD ENDPOINTS
+  // ============================================================
+
+  /// Renew card using short code
+  static Future<Map<String, dynamic>> renewCard({
+    required String shortCode,
+    required String validDate,
+  }) async {
+    try {
+      final url = Uri.parse('${ServerEndpoints.baseUrl}/quick/renew');
+      final headers = await _buildHeaders(requiresAuth: false);
+      // Remove JSON content-type header for form data encoding
+      headers.remove('Content-Type');
+
+      final formData = {
+        'short_code': shortCode,
+        'valid_date': validDate,
+      };
+
+      logger.i('Renewing card with short code: $shortCode, date: $validDate');
+
+      final response = await http
+          .post(url, headers: headers, body: formData)
+          .timeout(const Duration(seconds: 10));
+
+      logger.i('Renew card response status: ${response.statusCode}');
+      logger.i('Renew card response: ${response.body}');
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+        return result;
+      } else {
+        final errorBody = jsonDecode(response.body);
+        final errorMessage =
+            errorBody['detail'] ?? errorBody['message'] ?? 'Failed to renew card';
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      logger.e('Error renewing card: $e');
+      _handleError('renewCard', e);
+      rethrow;
+    }
+  }
+
+  /// Renew card using phone number
+  static Future<Map<String, dynamic>> renewCardByPhone({
+    required String phone,
+    required int eventId,
+    required String validDate,
+  }) async {
+    try {
+      final url = Uri.parse('${ServerEndpoints.baseUrl}/quick/renew-by-phone');
+      final headers = await _buildHeaders(requiresAuth: false);
+      // Remove JSON content-type header for form data encoding
+      headers.remove('Content-Type');
+
+      final formData = {
+        'phone': phone,
+        'registered_event_id': eventId.toString(),
+        'valid_date': validDate,
+      };
+
+      logger.i('Renewing card by phone: $phone, date: $validDate');
+
+      final response = await http
+          .post(url, headers: headers, body: formData)
+          .timeout(const Duration(seconds: 10));
+
+      logger.i('Renew by phone response status: ${response.statusCode}');
+      logger.i('Renew by phone response: ${response.body}');
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+        return result;
+      } else {
+        final errorBody = jsonDecode(response.body);
+        final errorMessage =
+            errorBody['detail'] ?? errorBody['message'] ?? 'Failed to renew card';
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      logger.e('Error renewing card by phone: $e');
+      _handleError('renewCardByPhone', e);
+      rethrow;
+    }
+  }
+
+  // ============================================================
+  // TOURIST PROFILE ENDPOINTS
+  // ============================================================
+
+  /// Get complete tourist profile with today's entries and history
+  static Future<Map<String, dynamic>> getTouristProfile({
+    required int userId,
+    int eventId = 1,
+  }) async {
+    try {
+      final url = Uri.parse('${ServerEndpoints.baseUrl}/profile/$userId')
+          .replace(queryParameters: {'event_id': eventId.toString()});
+      final headers = await _buildHeaders();
+
+      logger.i('Fetching tourist profile for user_id: $userId, event_id: $eventId');
+
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 10));
+
+      logger.i('Tourist profile response status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+        
+        logger.i('Tourist profile data received successfully ${result.toString()}');
+        return result;
+      } else if (response.statusCode == 404) {
+        throw Exception('Tourist not found');
+      } else {
+        final errorBody = jsonDecode(response.body);
+        final errorMessage =
+            errorBody['detail'] ?? errorBody['message'] ?? 'Failed to fetch profile';
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      logger.e('Error fetching tourist profile: $e');
+      _handleError('getTouristProfile', e);
+      rethrow;
+    }
+  }
+
+  /// Get complete tourist profile by phone number
+  static Future<Map<String, dynamic>> getTouristProfileByPhone({
+    required String phone,
+    int eventId = 1,
+  }) async {
+    try {
+      final url = Uri.parse('${ServerEndpoints.baseUrl}/profile/phone/$phone')
+          .replace(queryParameters: {'event_id': eventId.toString()});
+      final headers = await _buildHeaders();
+
+      logger.i('Fetching tourist profile by phone: $phone, event_id: $eventId');
+
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 10));
+
+      logger.i('Tourist profile by phone response status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+        return result;
+      } else if (response.statusCode == 404) {
+        throw Exception('Tourist not found with this phone number');
+      } else {
+        final errorBody = jsonDecode(response.body);
+        final errorMessage =
+            errorBody['detail'] ?? errorBody['message'] ?? 'Failed to fetch profile';
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      logger.e('Error fetching tourist profile by phone: $e');
+      _handleError('getTouristProfileByPhone', e);
+      rethrow;
+    }
+  }
+
+  /// Get complete tourist profile with related users (same phone number)
+  static Future<Map<String, dynamic>> getTouristWithRelated({
+    required int userId,
+    int eventId = 1,
+  }) async {
+    try {
+      final url = Uri.parse('${ServerEndpoints.baseUrl}/complete/$userId')
+          .replace(queryParameters: {'event_id': eventId.toString()});
+      final headers = await _buildHeaders();
+
+      logger.i('Fetching complete profile with related users for user_id: $userId, event_id: $eventId');
+
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 10));
+
+      logger.i('Complete profile response status: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+        return result;
+      } else if (response.statusCode == 404) {
+        throw Exception('Tourist not found');
+      } else {
+        final errorBody = jsonDecode(response.body);
+        final errorMessage =
+            errorBody['detail'] ?? errorBody['message'] ?? 'Failed to fetch profile';
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      logger.e('Error fetching complete tourist profile: $e');
+      _handleError('getTouristWithRelated', e);
+      rethrow;
+    }
+  }
+
+  // ============================================================
+  // SHORT CODE CARD ENDPOINTS
+  // ============================================================
+
+  /// Resolve short code to get visitor card URLs and token
+  static Future<Map<String, dynamic>> resolveShortCode({
+    required String shortCode,
+  }) async {
+    try {
+      final url = Uri.parse('${ServerEndpoints.baseUrl}/tourists/short/$shortCode');
+      final headers = await _buildHeaders(requiresAuth: false);
+
+      logger.i('Resolving short code: $shortCode');
+
+      final response = await http
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 10));
+
+      logger.i('Resolve short code response status: ${response.statusCode}');
+      logger.i('Resolve short code response: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final result = jsonDecode(response.body);
+        return result;
+      } else if (response.statusCode == 404) {
+        throw Exception('Short code not found');
+      } else if (response.statusCode == 410) {
+        throw Exception('Short link has expired');
+      } else {
+        final errorBody = jsonDecode(response.body);
+        final errorMessage =
+            errorBody['detail'] ?? errorBody['message'] ?? 'Failed to resolve short code';
+        throw Exception(errorMessage);
+      }
+    } catch (e) {
+      logger.e('Error resolving short code: $e');
+      _handleError('resolveShortCode', e);
+      rethrow;
     }
   }
 }

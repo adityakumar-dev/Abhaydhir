@@ -1,8 +1,8 @@
 class ServerEndpoints {
   // Base URL - for testing
-  // static String baseUrl = 'https://enabled-flowing-bedbug.ngrok-free.app';
+  static String baseUrl = 'https://enabled-flowing-bedbug.ngrok-free.app';
   // Base URL - for production 
-  static String baseUrl = 'https://api.vmsbutu.live';
+//   static String baseUrl = 'https://api.vmsbutu.live';
   
 
   // ============================================================
@@ -43,8 +43,10 @@ class ServerEndpoints {
       '$baseUrl/tourists/?limit=$limit&offset=$offset';
   
   // Get tourists by event (Admin/Security)
-  static String getTouristsByEvent(int eventId, {int limit = 20, int offset = 0}) => 
-      '$baseUrl/tourists/event/$eventId?limit=$limit&offset=$offset';
+  static String getTouristsByEvent(int eventId, {String? date, int limit = 20, int offset = 0}) => 
+      date != null
+          ? '$baseUrl/tourists/event/$eventId?date=$date&limit=$limit&offset=$offset'
+          : '$baseUrl/tourists/event/$eventId?limit=$limit&offset=$offset';
   
   // Get single tourist by ID (Admin/Security)
   static String getTouristById(int userId) => '$baseUrl/tourists/$userId';

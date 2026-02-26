@@ -8,8 +8,11 @@ import 'package:spring_admin/screens/home/dashboard_title.dart';
 import 'package:spring_admin/screens/help.dart';
 import 'package:spring_admin/screens/guest%20list/guest_list.dart';
 import 'package:spring_admin/screens/login/login.dart';
-import 'package:spring_admin/screens/new%20entry/qr_code_verify.dart';
+import 'package:spring_admin/screens/new%20entry/entry_method_selector.dart';
 import 'package:spring_admin/screens/new%20entry/departure_screen.dart';
+import 'package:spring_admin/screens/new%20entry/qr_code_verify.dart';
+import 'package:spring_admin/screens/new%20entry/renew_card.dart';
+import 'package:spring_admin/screens/short_code_scanner.dart';
 import 'package:spring_admin/screens/quick_register.dart';
 import 'package:spring_admin/providers/event_provider.dart';
 import 'package:spring_admin/utils/ui/ui_helper.dart';
@@ -133,19 +136,15 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF5F5F5),
       appBar: PreferredSize(
-        preferredSize: Size.fromHeight(kToolbarHeight),
+        preferredSize: const Size.fromHeight(kToolbarHeight),
         child: Container(
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                Color(0xFFFFCCCB),
-                Color(0xFFF5F5F5),
-                Color(0xFFF5F5F5).withOpacity(0.1),
-              ],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
+              colors: [Color(0xFF00897B), Color(0xFF26A69A)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
             ),
           ),
           child: AppBar(
@@ -153,38 +152,32 @@ class _HomeScreenState extends State<HomeScreen> {
             backgroundColor: Colors.transparent,
             elevation: 0,
             leading: Container(),
-            
-            title: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            title: const Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-              
-                const Column(
-                  children: [
-                    Text(
-                      'SPRING FESTIVAL 2026',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 12,
-                        color: const Color(0xFF1A237E),
-                      ),
-                    ),
-                    Text(
-                      'Security Portal',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Color.fromARGB(255, 10, 128, 120),
-                      ),
-                    ),
-                  ],
+                Text(
+                  'SPRING FESTIVAL 2026',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                    color: Colors.white,
+                  ),
+                ),
+                Text(
+                  'Security Portal',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.white70,
+                  ),
                 ),
               ],
             ),
-            centerTitle: false,
+            centerTitle: true,
             actions: [
               IconButton(
                 icon: const Icon(
                   Icons.logout_rounded,
-                  color: Color.fromARGB(255, 10, 128, 120),
+                  color: Colors.white,
                 ),
                 onPressed: () async {
                   showDialog(context: context, builder: (context) => AlertDialog(
@@ -209,6 +202,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   ));
                 },
               ),
+              IconButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const QrCodeVerifyScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.qr_code_rounded, color: Colors.white),
+              )
             ],
           ),
         ),
@@ -217,21 +221,6 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Positioned(
-              bottom: -190,
-              left: 150,
-              right: -150,
-              child: Container(
-                height: MediaQuery.of(context).size.height * 0.4,
-                child: Image.asset(
-                  'assets/images/aipen.png',
-                  // width: ,
-                  height: MediaQuery.of(context).size.height * 0.4,
-                  color: Color.fromARGB(255, 255, 165, 164),
-                ),
-              ),
-            ),
-        
             Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               mainAxisAlignment: MainAxisAlignment.center,
@@ -328,34 +317,30 @@ class _HomeScreenState extends State<HomeScreen> {
                         Icons.person_add_rounded,
                         const Color.fromARGB(255, 52, 55, 95),
                         () async {
-                          await Navigator.pushNamed(
+                          Navigator.push(
                             context,
-                            QrCodeVerifyScreen.routeName,
-                            arguments: {
-                            'eventId' : eventProvider.selectedEventId,
-
-                            }
-                          );
-                         
-
-                      },
-                      ),
-                      buildDashboardTile(
-                        context,
-                        'Departure',
-                        'Exit the Guest',
-                        Icons.exit_to_app_rounded,
-                        const Color.fromARGB(255, 52, 55, 95),
-                        () async {
-                          await Navigator.pushNamed(
-                            context,
-                            DepartureScreen.routeName,
-                            arguments: {
-                              'eventId': eventProvider.selectedEventId,
-                            }
+                            MaterialPageRoute(
+                              builder: (_) => const EntryMethodSelector(),
+                            ),
                           );
                         },
                       ),
+                      // buildDashboardTile(
+                      //   context,
+                      //   'Departure',
+                      //   'Exit the Guest',
+                      //   Icons.exit_to_app_rounded,
+                      //   const Color.fromARGB(255, 52, 55, 95),
+                      //   () async {
+                      //     await Navigator.pushNamed(
+                      //       context,
+                      //       DepartureScreen.routeName,
+                      //       arguments: {
+                      //         'eventId': eventProvider.selectedEventId,
+                      //       }
+                      //     );
+                      //   },
+                      // ),
                       buildDashboardTile(
                         context,
                         'Quick Register',
@@ -378,8 +363,34 @@ class _HomeScreenState extends State<HomeScreen> {
                           AnalyticsScreen.routeName,
                         ),
                       ),
-            buildDashboardTile(context, "Help", "Adhaydhir help center", Icons.help,                        const Color.fromARGB(255, 52, 55, 95) , () => Navigator.pushNamed(context, HelpScreen.routeName))
-                   ,  
+                      buildDashboardTile(
+                        context,
+                        'Renew Card',
+                        'Renew guest card',
+                        Icons.card_giftcard,
+                        const Color.fromARGB(255, 200, 124, 17),
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const RenewCard(),
+                          ),
+                        ),
+                      ),
+                      buildDashboardTile(
+                        context,
+                        'View My Card',
+                        'Lookup card by code',
+                        Icons.credit_card_rounded,
+                        const Color(0xFF00897B),
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ShortCodeScannerScreen(),
+                          ),
+                        ),
+                      ),
+            // buildDashboardTile(context, "Help", "Adhaydhir help center", Icons.help,                        const Color.fromARGB(255, 52, 55, 95) , () => Navigator.pushNamed(context, HelpScreen.routeName))
+            //        , 
                     ],
                   ),
                 ),

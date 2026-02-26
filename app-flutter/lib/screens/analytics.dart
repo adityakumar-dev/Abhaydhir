@@ -47,9 +47,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
       
       if (!mounted) return;
       
-      if (data != null && data['success'] == true) {
+      if (data != null) {
         setState(() {
-          analyticsData = data['analytics'];
+          analyticsData = data;
           isLoading = false;
         });
       } else {
@@ -74,29 +74,27 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
       appBar: PreferredSize(
         preferredSize: Size.fromHeight(kToolbarHeight),
         child: Container(
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                Color(0xFFFFCCCB),
-                Color(0xFFFFCCCB).withOpacity(0.6),
-                Color(0xFFF5F5F5).withOpacity(0.1)
-              ],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [Color(0xFF1A237E), Color(0xFF3949AB)],
             ),
           ),
           child: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
             title: const Text(
-              'Analytics',
+              'Event Analytics',
               style: TextStyle(
-                color: Color(0xFF1A237E),
+                color: Colors.white,
                 fontWeight: FontWeight.bold,
+                fontSize: 20,
               ),
             ),
+            centerTitle: true,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Color(0xFF1A237E)),
+              icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
               onPressed: () => Navigator.pop(context),
             ),
           ),
@@ -106,26 +104,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                width: double.infinity,
-                height: 70,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Color(0xFFFFCCCB),
-                      Color(0xFFFFCCCB).withOpacity(0.6),
-                      Color(0xFFF5F5F5).withOpacity(0.1)
-                    ],
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                  ),
-                ),
-              ),
-            ),
             if (isLoading)
               const Center(
                 child: CircularProgressIndicator(
@@ -139,18 +117,27 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
                   children: [
                     Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
                     const SizedBox(height: 16),
-                    Text(
-                      errorMessage!,
-                      style: TextStyle(color: Colors.grey[600]),
-                      textAlign: TextAlign.center,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Text(
+                        errorMessage!,
+                        style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
                       onPressed: loadAnalytics,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF1A237E),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                      child: const Text('Retry', style: TextStyle(color: Colors.white)),
                     ),
                   ],
                 ),
@@ -162,6 +149,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
             else
               RefreshIndicator(
                 onRefresh: loadAnalytics,
+                color: const Color(0xFF1A237E),
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(16.0),
@@ -173,23 +161,41 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
                         'Event Information',
                         Column(
                           children: [
-                            _buildStatRow('Event', analyticsData!['event']['name']),
-                            _buildStatRow('Location', analyticsData!['event']['location']),
-                            _buildStatRow('Date', _formatDate(analyticsData!['event']['date'])),
-                            _buildStatRow('Max Capacity', analyticsData!['event']['max_capacity']?.toString() ?? 'N/A'),
+                            _buildStatRow('Event', analyticsData!['event_info']['name']),
+                            _buildStatRow('Location', analyticsData!['event_info']['location']),
+                            _buildStatRow('Start Date', _formatDate(analyticsData!['event_info']['start_date'])),
+                            _buildStatRow('End Date', _formatDate(analyticsData!['event_info']['end_date'])),
+                            if (analyticsData!['event_info']['max_capacity'] != null)
+                              _buildStatRow('Max Capacity', analyticsData!['event_info']['max_capacity'].toString()),
                           ],
                         ),
                         Icons.event,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 20),
 
-                      // Crowd Status Cards
-                      Text(
-                        'Current Crowd Status',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1A237E),
+                      // Crowd Status Section Header
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 4,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1A237E),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Current Crowd Status',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1A237E),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -198,18 +204,18 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
                           Expanded(
                             child: _buildStatCard(
                               'Currently Inside',
-                              analyticsData!['crowd_status']['currently_inside'].toString(),
+                              (analyticsData!['crowd_status']['currently_inside'] ?? 0).toString(),
                               Icons.people,
-                              _getCapacityColor(analyticsData!['crowd_status']['capacity_status']),
+                              _getCapacityColor(analyticsData!['crowd_status']['capacity_status'] ?? 'unknown'),
                             ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: _buildStatCard(
                               'Total People',
-                              analyticsData!['crowd_status']['total_people_inside'].toString(),
+                              (analyticsData!['crowd_status']['total_people_inside'] ?? 0).toString(),
                               Icons.groups,
-                              _getCapacityColor(analyticsData!['crowd_status']['capacity_status']),
+                              _getCapacityColor(analyticsData!['crowd_status']['capacity_status'] ?? 'unknown'),
                             ),
                           ),
                         ],
@@ -220,7 +226,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
                           Expanded(
                             child: _buildStatCard(
                               'Groups',
-                              analyticsData!['crowd_status']['groups_inside'].toString(),
+                              (analyticsData!['crowd_status']['groups_inside'] ?? 0).toString(),
                               Icons.group,
                               Colors.blue,
                             ),
@@ -229,25 +235,38 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
                           Expanded(
                             child: _buildStatCard(
                               'Individuals',
-                              analyticsData!['crowd_status']['individuals_inside'].toString(),
+                              (analyticsData!['crowd_status']['individuals_inside'] ?? 0).toString(),
                               Icons.person,
                               Colors.green,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      // Capacity Status Banner
-                      _buildCapacityBanner(),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 20),
 
                       // Last Hour Statistics
-                      Text(
-                        'Last Hour Statistics',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1A237E),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 4,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1A237E),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Last Hour Statistics',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1A237E),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -257,19 +276,19 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
                           children: [
                             _buildStatRow(
                               'Total Entries',
-                              analyticsData!['last_hour']['entries'].toString(),
+                              (analyticsData!['last_hour']['entries'] ?? 0).toString(),
                             ),
                             _buildStatRow(
                               'Unique Visitors',
-                              analyticsData!['last_hour']['unique_visitors'].toString(),
+                              (analyticsData!['last_hour']['unique_visitors'] ?? 0).toString(),
                             ),
                             _buildStatRow(
                               'Entry Rate',
-                              '${analyticsData!['last_hour']['entry_rate_per_minute'].toStringAsFixed(1)}/min',
+                              '${((analyticsData!['last_hour']['entry_rate_per_min'] ?? 0.0) as num).toStringAsFixed(1)}/min',
                             ),
                             _buildStatRow(
-                              'Avg Processing Time',
-                              '${analyticsData!['last_hour']['avg_processing_time_seconds'].toStringAsFixed(1)}s',
+                              'Bypass Entries',
+                              (analyticsData!['last_hour']['bypass_entries'] ?? 0).toString(),
                             ),
                           ],
                         ),
@@ -277,15 +296,31 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
                       ),
                       const SizedBox(height: 12),
                       _buildEntryTypeBreakdown(),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 20),
 
                       // Today's Summary
-                      Text(
-                        'Today\'s Summary',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1A237E),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 4,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF1A237E),
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Today\'s Summary',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1A237E),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -294,7 +329,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
                           Expanded(
                             child: _buildStatCard(
                               'Unique Visitors',
-                              analyticsData!['today_summary']['total_unique_visitors'].toString(),
+                              (analyticsData!['today_summary']['total_unique_visitors'] ?? 0).toString(),
                               Icons.person_outline,
                               Color(0xFF1A237E),
                             ),
@@ -303,101 +338,18 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
                           Expanded(
                             child: _buildStatCard(
                               'Total Entries',
-                              analyticsData!['today_summary']['total_entries'].toString(),
+                              (analyticsData!['today_summary']['total_entries'] ?? 0).toString(),
                               Icons.login,
                               Colors.blue,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildStatCard(
-                              'Exited',
-                              analyticsData!['today_summary']['exited_visitors'].toString(),
-                              Icons.logout,
-                              Colors.orange,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildStatCard(
-                              'Avg Duration',
-                              '${analyticsData!['today_summary']['avg_visit_duration_minutes'].toStringAsFixed(0)}m',
-                              Icons.timer,
-                              Colors.purple,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 20),
 
-                      // Hourly Distribution
-                      _buildAnalyticsCard(
-                        'Hourly Distribution',
-                        _buildHourlyChart(),
-                        Icons.timeline,
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Peak Hour Info
-                      if (analyticsData!['peak_hour'] != null) ...[
-                        _buildAnalyticsCard(
-                          'Peak Hour',
-                          Column(
-                            children: [
-                              Text(
-                                '${analyticsData!['peak_hour']['hour']}:00',
-                                style: TextStyle(
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF1A237E),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              _buildStatRow(
-                                'Entries',
-                                analyticsData!['peak_hour']['entries'].toString(),
-                              ),
-                              _buildStatRow(
-                                'Unique Visitors',
-                                analyticsData!['peak_hour']['unique_visitors'].toString(),
-                              ),
-                            ],
-                          ),
-                          Icons.trending_up,
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-
-                      // Scanning Performance
-                      // _buildAnalyticsCard(
-                      //   'Scanning Performance',
-                      //   Column(
-                      //     children: [
-                      //       _buildStatRow(
-                      //         'Average Scan Time',
-                      //         '${analyticsData!['scanning_performance']['avg_scan_time_seconds'].toStringAsFixed(2)}s',
-                      //       ),
-                      //       _buildStatRow(
-                      //         'Min Scan Time',
-                      //         '${analyticsData!['scanning_performance']['min_scan_time_seconds'].toStringAsFixed(2)}s',
-                      //       ),
-                      //       _buildStatRow(
-                      //         'Max Scan Time',
-                      //         '${analyticsData!['scanning_performance']['max_scan_time_seconds'].toStringAsFixed(2)}s',
-                      //       ),
-                      //       _buildStatRow(
-                      //         'Median Scan Time',
-                      //         '${analyticsData!['scanning_performance']['median_scan_time_seconds'].toStringAsFixed(2)}s',
-                      //       ),
-                      //     ],
-                      //   ),
-                      //   Icons.qr_code_scanner,
-                      // ),
-                      // const SizedBox(height: 16),
+                      // Registrations Summary
+                      _buildRegistrationsSummary(),
+                      const SizedBox(height: 20),
 
                       // Recent Entries
                       _buildRecentEntriesSection(),
@@ -414,34 +366,55 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
 
   Widget _buildStatCard(String title, String value, IconData icon, Color color) {
     return Card(
-      elevation: 0,
+      elevation: 2,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: color,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white,
+              color.withOpacity(0.05),
+            ],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 28),
               ),
-            ),
-            Text(
-              title,
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 14,
+              const SizedBox(height: 12),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
               ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                title,
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -449,33 +422,52 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
 
   Widget _buildAnalyticsCard(String title, Widget content, IconData icon) {
     return Card(
-      elevation: 0,
+      elevation: 2,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(16),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(icon, color: Color(0xFF1A237E)),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1A237E),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white,
+              Color(0xFF1A237E).withOpacity(0.03),
+            ],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Color(0xFF1A237E).withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(icon, color: Color(0xFF1A237E), size: 22),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            content,
-          ],
+                  const SizedBox(width: 12),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A237E),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              content,
+            ],
+          ),
         ),
       ),
     );
@@ -521,59 +513,59 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
     }
   }
 
-  Widget _buildCapacityBanner() {
-    final capacityPercentage = analyticsData!['crowd_status']['capacity_percentage'];
-    final capacityStatus = analyticsData!['crowd_status']['capacity_status'];
+  // Widget _buildCapacityBanner() {
+  //   final capacityPercentage = ((analyticsData!['crowd_status']['capacity_percentage'] ?? 0.0) as num);
+  //   final capacityStatus = analyticsData!['crowd_status']['capacity_status'] ?? 'unknown';
     
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _getCapacityColor(capacityStatus).withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _getCapacityColor(capacityStatus),
-          width: 2,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            capacityStatus == 'critical' 
-                ? Icons.warning_amber_rounded 
-                : Icons.info_outline,
-            color: _getCapacityColor(capacityStatus),
-            size: 32,
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Capacity: ${capacityPercentage.toStringAsFixed(1)}%',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: _getCapacityColor(capacityStatus),
-                  ),
-                ),
-                Text(
-                  'Status: ${capacityStatus.toUpperCase()}',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: _getCapacityColor(capacityStatus),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  //   return Container(
+  //     padding: const EdgeInsets.all(16),
+  //     decoration: BoxDecoration(
+  //       color: _getCapacityColor(capacityStatus).withOpacity(0.1),
+  //       borderRadius: BorderRadius.circular(12),
+  //       border: Border.all(
+  //         color: _getCapacityColor(capacityStatus),
+  //         width: 2,
+  //       ),
+  //     ),
+  //     child: Row(
+  //       children: [
+  //         Icon(
+  //           capacityStatus == 'critical' 
+  //               ? Icons.warning_amber_rounded 
+  //               : Icons.info_outline,
+  //           color: _getCapacityColor(capacityStatus),
+  //           size: 32,
+  //         ),
+  //         const SizedBox(width: 16),
+  //         Expanded(
+  //           child: Column(
+  //             crossAxisAlignment: CrossAxisAlignment.start,
+  //             children: [
+  //               Text(
+  //                 'Capacity: ${capacityPercentage.toStringAsFixed(1)}%',
+  //                 style: TextStyle(
+  //                   fontSize: 18,
+  //                   fontWeight: FontWeight.bold,
+  //                   color: _getCapacityColor(capacityStatus),
+  //                 ),
+  //               ),
+  //               Text(
+  //                 'Status: ${capacityStatus.toUpperCase()}',
+  //                 style: TextStyle(
+  //                   fontSize: 14,
+  //                   color: _getCapacityColor(capacityStatus),
+  //                 ),
+  //               ),
+  //             ],
+  //           ),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   Widget _buildEntryTypeBreakdown() {
-    final entryTypes = analyticsData!['entry_types'] as List;
+    final entryTypes = analyticsData!['entry_type_breakdown'] as List;
     
     if (entryTypes.isEmpty) {
       return const SizedBox.shrink();
@@ -583,6 +575,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
       'Entry Type Breakdown',
       Column(
         children: entryTypes.map((type) {
+          final percentage = ((type['percentage'] ?? 0) as num) / 100.0;
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Row(
@@ -592,7 +585,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        type['entry_type'].toString().toUpperCase(),
+                        (type['entry_type'] ?? '').toString().replaceAll('_', ' ').toUpperCase(),
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF1A237E),
@@ -600,10 +593,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
                       ),
                       const SizedBox(height: 4),
                       LinearProgressIndicator(
-                        value: type['percentage'] / 100,
+                        value: percentage,
                         backgroundColor: Colors.grey[200],
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          _getEntryTypeColor(type['entry_type']),
+                          _getEntryTypeColor(type['entry_type'] ?? ''),
                         ),
                       ),
                     ],
@@ -614,7 +607,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      type['count'].toString(),
+                      (type['count'] ?? 0).toString(),
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -622,7 +615,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
                       ),
                     ),
                     Text(
-                      '${type['percentage'].toStringAsFixed(1)}%',
+                      '${((type['percentage'] ?? 0) as num).toStringAsFixed(1)}%',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[600],
@@ -641,7 +634,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
 
   Color _getEntryTypeColor(String type) {
     switch (type) {
-      case 'normal':
+      case 'qr_code_scan':
         return Colors.green;
       case 'bypass':
         return Colors.orange;
@@ -650,78 +643,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
       default:
         return Colors.grey;
     }
-  }
-
-  Widget _buildHourlyChart() {
-    final hourlyData = analyticsData!['hourly_distribution'] as List;
-    
-    if (hourlyData.isEmpty) {
-      return const Text('No hourly data available');
-    }
-    
-    final maxEntries = hourlyData.fold<num>(
-      0,
-      (max, item) => item['entries'] > max ? item['entries'] : max,
-    );
-    
-    return Column(
-      children: hourlyData.map<Widget>((hourData) {
-        final hour = hourData['hour'].toString().padLeft(2, '0');
-        final entries = hourData['entries'] as num;
-        final percentage = maxEntries > 0 ? entries / maxEntries : 0;
-        
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 60,
-                child: Text(
-                  '$hour:00',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1A237E),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Stack(
-                  children: [
-                    Container(
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                    FractionallySizedBox(
-                      widthFactor: percentage.toDouble(),
-                      child: Container(
-                        height: 30,
-                        decoration: BoxDecoration(
-                          color: const Color.fromARGB(255, 10, 128, 120),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 8),
-                        child: Text(
-                          entries.toString(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
-    );
   }
 
   String _formatTime(String? timestamp) {
@@ -743,6 +664,65 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
     } catch (e) {
       return dateString;
     }
+  }
+
+  Widget _buildRegistrationsSummary() {
+    final regSummary = analyticsData!['registrations_summary'];
+    final attendanceRate = regSummary['attendance_rate_pct'] ?? 0.0;
+    
+    return _buildAnalyticsCard(
+      'Registrations Summary',
+      Column(
+        children: [
+          _buildStatRow(
+            'Total Registered',
+            (regSummary['total_registered'] ?? 0).toString(),
+          ),
+          _buildStatRow(
+            'Registered Members',
+            (regSummary['total_registered_members'] ?? 0).toString(),
+          ),
+          _buildStatRow(
+            'Individuals',
+            (regSummary['total_reg_individuals'] ?? 0).toString(),
+          ),
+          _buildStatRow(
+            'Groups',
+            (regSummary['total_reg_groups'] ?? 0).toString(),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.withOpacity(0.3)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Attendance Rate',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1A237E),
+                  ),
+                ),
+                Text(
+                  '${attendanceRate.toStringAsFixed(1)}%',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      Icons.people_outline,
+    );
   }
 
   Widget _buildRecentEntriesSection() {
@@ -794,7 +774,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> with EventRequiredMix
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${entry['unique_id_type'].toString().toUpperCase()} • ${entry['entry_type'].toString().toUpperCase()}',
+                    '${entry['entry_type'].toString().replaceAll('_', ' ').toUpperCase()}',
                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                   if (entry['is_group'])

@@ -8,7 +8,7 @@ import {
 import Link from "next/link";
 import { api } from "@/services/api";
 import { Spinner } from "@/components/ui/spinner";
-import router, { useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { Toast } from "@/components/ui/toast";
 import DownloadCardPopup from "@/components/download_card";
@@ -59,11 +59,10 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
   const [formData, setFormData] = useState({
     fullName: "",
     phone: "",
-    unique_id_type: "aadhar",
-    unique_id: "",
     is_group: false,
     group_count: 1,
     photo: null as File | null,
+    unique_id_photo: null as File | null,
     valid_date: "",
   });
 
@@ -73,7 +72,6 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
   const [isLoadingOverlayOpen, setIsLoadingOverlayOpen] = useState(false);
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [download,setDownload] = useState<boolean>(false)
   const [isDownloadPopupOpen, setIsDownloadPopupOpen] = useState(false);
   const [downloadCardPath, setDownloadCardPath] = useState<string | null>(null);
 
@@ -86,6 +84,14 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFormData({ ...formData, photo: e.target.files[0] });
+    }
+  };
+
+  const handleUniqueIdPhotoChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    if (e.target.files && e.target.files[0]) {
+      setFormData({ ...formData, unique_id_photo: e.target.files[0] });
     }
   };
 
@@ -103,12 +109,8 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
         showToast("Please upload a valid profile photo.", "error");
         return;
       }
-      if (!formData.unique_id_type) {
-        showToast("Please select a valid ID type", "error");
-        return;
-      }
-      if (!formData.unique_id) {
-        showToast("Please enter a valid ID number", "error");
+      if (!formData.unique_id_photo) {
+        showToast("Please upload a valid ID photo.", "error");
         return;
       }
       if (!formData.fullName) {
@@ -133,14 +135,13 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
       const registrationPayload = {
         name: formData.fullName.trim(),
         phone: formData.phone,
-        unique_id_type: formData.unique_id_type,
-        unique_id: formData.unique_id,
         is_group: formData.is_group,
         group_count: formData.group_count,
         registered_event_id: event_id,
         valid_date: formData.valid_date,
 
         photo: formData.photo as File,
+        unique_id_photo: formData.unique_id_photo as File,
       };
       console.log("Submitting registration with payload:", registrationPayload);
       const parsedData = await api.registerTourist(registrationPayload);
@@ -171,9 +172,16 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
     }
     if (eventExists === false) {
       return (
-        <div className="p-8 text-center">
-          <h2 className="text-xl font-bold text-red-600 mb-4">Invalid or inactive event</h2>
-          <p className="text-gray-700">The event you are trying to register for does not exist or is not active.</p>
+        <div className="p-12 text-center">
+          <div className="mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 mb-4">
+              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+          <h2 className="text-2xl font-bold text-red-600 mb-3">Invalid or Inactive Event</h2>
+          <p className="text-gray-600">The event you are trying to register for does not exist or is not active.</p>
         </div>
       );
     }
@@ -183,239 +191,281 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
     }
 
     return (
-      <div className="space-y-4 sm:space-y-6">
-        <div className="flex items-center justify-center">
-          <h1 className="text-2xl font-bold">Tourist Registration - Spring Festival 2026</h1>
+      <div className="space-y-6">
+        <div className="text-center space-y-2 mb-8">
+          <h1 className="text-4xl sm:text-3xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent">
+            Tourist Registration
+          </h1>
+          <p className="text-gray-600 font-medium">Spring Festival 2026</p>
         </div>
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-sm text-blue-700">
-            Register as a tourist to receive your visitor card with QR code. 
-            A welcome sms with your visitor card url will be sent to your registered phone address.
-          </p>
-        </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">
-            Full Name
-          </label>
-          <input
-            name="fullName"
-            value={formData.fullName}
-            onChange={handleInputChange}
-            className="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-yellow-200 focus:border-yellow-400"
-            placeholder="Enter your full name"
-            autoComplete="name"
-          />
-        </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">
-            Your Entry Date
-          </label>
-          <div className="flex gap-2">
-            {["2026-02-27", "2026-02-28", "2026-03-01"].map((date) => (
-              <button
-                key={date}
-                type="button"
-                className={`px-4 py-2 rounded-lg border transition-all font-semibold text-sm
-                  ${formData.valid_date === date
-                    ? "bg-yellow-500 text-white border-yellow-600 shadow"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-yellow-50"}
-                `}
-                onClick={() => setFormData({ ...formData, valid_date: date })}
-              >
-                {date === "2026-02-27" && "27 Feb"}
-                {date === "2026-02-28" && "28 Feb"}
-                {date === "2026-03-01" && "1 March"}
-              </button>
-            ))}
+        <div className="bg-gradient-to-r from-amber-50 via-orange-50 to-yellow-50 border-2 border-yellow-200 rounded-xl p-5 shadow-sm">
+          <div className="flex gap-3">
+            <div className="flex-shrink-0">
+              <svg className="w-5 h-5 text-yellow-700 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 5v8a2 2 0 01-2 2h-5l-5 4v-4H4a2 2 0 01-2-2V5a2 2 0 012-2h12a2 2 0 012 2z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="text-sm text-yellow-800">
+              <p className="font-semibold mb-1">Welcome, Tourist!</p>
+              <p>Register to receive your digital visitor card with QR code. We'll send you a welcome SMS with your entry pass.</p>
+            </div>
           </div>
         </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-gray-700">Phone</label>
-          <input
-            type="tel"
-            name="phone"
-            inputMode="numeric"
-            maxLength={10}
-            value={formData.phone}
-            onChange={(e) => {
-              const digits = e.target.value.replace(/\D/g, "");
-              setFormData({ ...formData, phone: digits });
-            }}
-            className="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-yellow-200 focus:border-yellow-400"
-            placeholder="Enter phone number"
-          />
-        </div>
-        <div className="space-y-4">
-          <label className="text-sm font-medium text-gray-700">
-            ID Type
-          </label>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4">
-            {["aadhar", "passport", "college_id", "other"].map((type) => (
-              <div
-                key={type}
-                className={`flex items-center justify-center p-3 rounded-lg cursor-pointer transition-all ${
-                  formData.unique_id_type === type
-                    ? "bg-yellow-100 border-2 border-yellow-600"
-                    : "bg-gray-50 border-2 border-transparent hover:bg-yellow-50"
-                }`}
-                onClick={() => setFormData({ ...formData, unique_id_type: type })}
-              >
-                <input
-                  type="radio"
-                  className="hidden"
-                  name="idType"
-                  value={type}
-                  checked={formData.unique_id_type === type}
-                  onChange={() => {}}
-                />
-                <label className="cursor-pointer capitalize">
-                  {type.replace("_", " ")}
-                </label>
-              </div>
-            ))}
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">
-              {formData.unique_id_type.replace("_", " ").charAt(0).toUpperCase() + 
-               formData.unique_id_type.replace("_", " ").slice(1)} Number
+        
+        <div className="space-y-5">
+          <div className="space-y-3">
+            <label className="block text-sm font-semibold text-gray-800">
+              Full Name <span className="text-red-500">*</span>
             </label>
-            <div className="relative">
-              <input
-                name="unique_id"
-                value={formData.unique_id}
-                maxLength={
-                  formData.unique_id_type === "aadhar" ? 12 :
-                  formData.unique_id_type === "passport" ? 10 :
-                  undefined
-                }
-                onChange={handleInputChange}
-                className="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-yellow-200 focus:border-yellow-400"
-                placeholder={`Enter ${formData.unique_id_type.replace("_", " ")} number`}
-              />
+            <input
+              name="fullName"
+              value={formData.fullName}
+              onChange={handleInputChange}
+              className="w-full px-4 py-3 rounded-lg border-2 border-gray-200 focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200 outline-none transition-all"
+              placeholder="Enter your full name"
+              autoComplete="name"
+            />
+          </div>
+          <div className="space-y-3">
+            <label className="block text-sm font-semibold text-gray-800">
+              Your Entry Date <span className="text-red-500">*</span>
+            </label>
+            <div className="flex gap-3 flex-wrap">
+              {["2026-02-27", "2026-02-28", "2026-03-01"].map((date) => (
+                <button
+                  key={date}
+                  type="button"
+                  className={`flex-1 min-w-[100px] px-4 py-3 rounded-lg border-2 transition-all font-semibold text-sm ${
+                    formData.valid_date === date
+                      ? "bg-gradient-to-br from-yellow-500 to-orange-500 text-white border-yellow-600 shadow-lg shadow-yellow-300/50"
+                      : "bg-white text-gray-700 border-gray-200 hover:border-yellow-400 hover:bg-yellow-50"
+                  }`}
+                  onClick={() => setFormData({ ...formData, valid_date: date })}
+                >
+                  {date === "2026-02-27" && "27 Feb"}
+                  {date === "2026-02-28" && "28 Feb"}
+                  {date === "2026-03-01" && "1 Mar"}
+                </button>
+              ))}
             </div>
           </div>
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <label className="text-sm font-medium text-gray-700">
-                Registration Type
-              </label>
-              <div className="grid grid-cols-2 gap-2 sm:gap-4">
-                {[
-                  { value: false, label: "Individual" },
-                  { value: true, label: "Group Registration" }
-                ].map((type) => (
-                  <div
-                    key={type.value.toString()}
-                    className={`flex items-center justify-center p-3 rounded-lg cursor-pointer transition-all ${
-                      formData.is_group === type.value
-                        ? "bg-yellow-100 border-2 border-yellow-600"
-                        : "bg-gray-50 border-2 border-transparent hover:bg-yellow-50"
-                    }`}
-                    onClick={() => setFormData({ 
-                      ...formData, 
-                      is_group: type.value,
-                      group_count: type.value ? Math.max(2, formData.group_count) : 1
-                    })}
-                  >
-                    <input
-                      type="radio"
-                      className="hidden"
-                      name="registrationType"
-                      value={type.value.toString()}
-                      checked={formData.is_group === type.value}
-                      onChange={() => {}}
-                    />
-                    <label className="cursor-pointer">
-                      {type.label}
-                    </label>
-                  </div>
-                ))}
-              </div>
+          <div className="space-y-3">
+            <label className="block text-sm font-semibold text-gray-800">
+              Phone Number <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="tel"
+              name="phone"
+              inputMode="numeric"
+              maxLength={10}
+              value={formData.phone}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/\D/g, "");
+                setFormData({ ...formData, phone: digits });
+              }}
+              className="w-full px-4 py-3 rounded-lg border-2 border-gray-200 focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200 outline-none transition-all"
+              placeholder="Enter 10-digit phone number"
+            />
+          </div>
+        </div>
 
-              {formData.is_group && (
-                <>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">
-                      Number of People in Group (minimum 2)
-                    </label>
-                    <input
-                      type="number"
-                      name="group_count"
-                      value={formData.group_count}
-                      onChange={handleInputChange}
-                      min="2"
-                      className="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-yellow-200 focus:border-yellow-400"
-                      placeholder="Enter number of people"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-sm text-gray-600">
-                      Note: This registration covers all members of your group. The group leader's photo and details will be used for the visitor card.
-                    </p>
-                  </div>
-                </>
-              )}
+        <div className="space-y-5 pt-2">
+          <div className="space-y-3">
+            <label className="block text-sm font-semibold text-gray-800">
+              Registration Type <span className="text-red-500">*</span>
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { value: false, label: "Individual", icon: "👤" },
+                { value: true, label: "Group", icon: "👥" }
+              ].map((type) => (
+                <button
+                  key={type.value.toString()}
+                  type="button"
+                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    formData.is_group === type.value
+                      ? "bg-yellow-100 border-yellow-500 shadow-lg shadow-yellow-200/50"
+                      : "bg-white border-gray-200 hover:border-yellow-300"
+                  }`}
+                  onClick={() => setFormData({
+                    ...formData,
+                    is_group: type.value,
+                    group_count: type.value ? Math.max(2, formData.group_count) : 1
+                  })}
+                >
+                  <div className="text-2xl mb-2">{type.icon}</div>
+                  <div className="text-sm font-semibold text-gray-800">{type.label}</div>
+                </button>
+              ))}
             </div>
           </div>
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">
-                Profile Photo
-              </label>
-              <input
-                type="file"
-                name="photo"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="w-full px-4 py-3 rounded-lg border focus:ring-2 focus:ring-yellow-200 focus:border-yellow-400"
-              />
-            </div>
-            <div>
-              <p>
-               NOTE : "Please upload valid and latest profile picture"
+
+          {formData.is_group && (
+            <div className="space-y-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg">
+              <div className="space-y-3">
+                <label className="block text-sm font-semibold text-gray-800">
+                  Number of People <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  name="group_count"
+                  value={formData.group_count}
+                  onChange={handleInputChange}
+                  min="2"
+                  className="w-full px-4 py-3 rounded-lg border-2 border-blue-200 focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200 outline-none transition-all"
+                  placeholder="Minimum 2 people"
+                />
+              </div>
+              <p className="text-sm text-blue-700 flex gap-2">
+                <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M18 5v8a2 2 0 01-2 2h-5l-5 4v-4H4a2 2 0 01-2-2V5a2 2 0 012-2h12a2 2 0 012 2z" clipRule="evenodd" />
+                </svg>
+                <span>The group leader's details will be used for the visitor card.</span>
               </p>
             </div>
-            {/* <div>
-              <p>NOTE : "If your registration failed please switch to chrome browser or device and try again"</p>
-            </div> */}
-        {/* <div className="flex items-center justify-center">
-          <h2 className="text-xl sm:text-sm font-semibold "></h2>
-        </div> */}
-            <button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="w-full bg-yellow-600 text-white px-6 py-3 rounde-lg hover:bg-yellow-700 transition-colors disabled:bg-yellow-400 disabled:cursor-not-allowed flex items-center justify-center"
-            >
-              {isSubmitting ? (
-                <>
-                  <Spinner />
-                  <span className="ml-2">Registering Tourist...</span>
-                </>
-              ) : (
-                "Complete Tourist Registration"
-              )}
-            </button>
-            {downloadCardPath && (
-            <div className="mt-4">
-              <Link 
-                href={downloadCardPath} 
+          )}
+        </div>
+
+        <div className="space-y-5 pt-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-3">
+              <label className="block text-sm font-semibold text-gray-800">
+                Profile Photo <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="file"
+                  name="photo"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                  id="profile-photo"
+                />
+                <label
+                  htmlFor="profile-photo"
+                  className="flex items-center justify-center w-full h-48 rounded-lg border-2 border-dashed border-yellow-300 bg-yellow-50 cursor-pointer hover:bg-yellow-100 transition-all overflow-hidden relative"
+                >
+                  {formData.photo ? (
+                    <>
+                      <img
+                        src={URL.createObjectURL(formData.photo)}
+                        alt="Profile preview"
+                        className="w-full h-full object-cover blur-sm"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="bg-white/95 px-6 py-2 rounded-lg font-semibold text-yellow-700 shadow-lg">
+                          Change Photo
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center">
+                      <svg className="mx-auto h-8 w-8 text-yellow-600 mb-2" stroke="currentColor" fill="none" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <p className="text-sm font-semibold text-yellow-900">Click to upload</p>
+                      <p className="text-xs text-yellow-700 mt-1">JPG, PNG • Max 5MB</p>
+                    </div>
+                  )}
+                </label>
+              </div>
+              <p className="text-xs text-gray-600">
+                📸 Upload a clear, well-lit frontal photo. Make sure your face is visible and not blocked.
+              </p>
+            </div>
+            <div className="space-y-3">
+              <label className="block text-sm font-semibold text-gray-800">
+                Unique ID Photo <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="file"
+                  name="unique_id_photo"
+                  accept="image/*"
+                  onChange={handleUniqueIdPhotoChange}
+                  className="hidden"
+                  id="id-photo"
+                />
+                <label
+                  htmlFor="id-photo"
+                  className="flex items-center justify-center w-full h-48 rounded-lg border-2 border-dashed border-orange-300 bg-orange-50 cursor-pointer hover:bg-orange-100 transition-all overflow-hidden relative"
+                >
+                  {formData.unique_id_photo ? (
+                    <>
+                      <img
+                        src={URL.createObjectURL(formData.unique_id_photo)}
+                        alt="ID preview"
+                        className="w-full h-full object-cover blur-sm"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="bg-white/95 px-6 py-2 rounded-lg font-semibold text-orange-700 shadow-lg">
+                          Change Photo
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center">
+                      <svg className="mx-auto h-8 w-8 text-orange-600 mb-2" stroke="currentColor" fill="none" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-5m-4 0V5a2 2 0 10-4 0v5m0 0H5" />
+                      </svg>
+                      <p className="text-sm font-semibold text-orange-900">Click to upload</p>
+                      <p className="text-xs text-orange-700 mt-1">JPG, PNG • Max 5MB</p>
+                    </div>
+                  )}
+                </label>
+              </div>
+              <p className="text-xs text-gray-600">
+                🆔 Upload a clear photo of your ID (Aadhar, Passport, College ID, or other valid ID).
+              </p>
+            </div>
+          </div>
+          <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded">
+            <p className="text-sm text-amber-800 font-medium">
+              ✓ Make sure your photos are clear, well-lit, and unblocked
+            </p>
+          </div>
+
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 disabled:from-yellow-300 disabled:to-orange-300 text-white font-bold px-6 py-4 rounded-lg shadow-lg shadow-yellow-200/50 transition-all disabled:cursor-not-allowed flex items-center justify-center gap-2 text-lg"
+          >
+            {isSubmitting ? (
+              <>
+                <Spinner />
+                <span>Registering...</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Complete Registration
+              </>
+            )}
+          </button>
+          {downloadCardPath && (
+            <div className="mt-6">
+              <Link
+                href={downloadCardPath}
                 target="_blank"
-                className="w-full flex items-center justify-center gap-2 bg-yellow-100 text-yellow-600 px-6 py-3 rounded-lg hover:bg-yellow-200 transition-colors"
+                className="w-full flex items-center justify-center gap-3 bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 border-2 border-green-300 px-6 py-4 rounded-lg hover:from-green-100 hover:to-emerald-100 transition-all font-semibold shadow-lg shadow-green-200/50"
               >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M2 9.5A6.5 6.5 0 1115.5 9 6.5 6.5 0 012 9.5zm10.5 2.25a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm-1.5-7a2 2 0 100-4 2 2 0 000 4z" />
+                </svg>
+                <span>Download Your Entry Pass</span>
                 <Download className="w-4 h-4" />
-                Download Your Entry Pass
               </Link>
             </div>
-            )}
-
-          </div>
+          )}
         </div>
       </div>
     );
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-yellow-50 to-white py-6 sm:py-12">
+    <div className="min-h-screen bg-gradient-to-br from-yellow-50 via-orange-50 to-amber-50 py-8 sm:py-16">
       {toast && (
         <Toast
           message={toast.message}
@@ -427,112 +477,23 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
       <div className="container mx-auto px-4 sm:px-6">
         <Link
           href="/"
-          className="inline-flex items-center text-yellow-600 hover:text-yellow-700 mb-4 sm:mb-8"
+          className="inline-flex items-center text-yellow-700 hover:text-yellow-800 font-semibold mb-8 transition-colors"
         >
-          <ArrowLeft className="w-4 h-4 mr-2" />
+          <ArrowLeft className="w-5 h-5 mr-2" />
           Back to Home
         </Link>
 
-        <div className="max-w-2xl mx-auto bg-white rounded-2xl shadow-lg p-4 sm:p-8">
-          {renderStep()}
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-white rounded-2xl shadow-2xl p-4 sm:p-8">
+            {renderStep()}
+          </div>
 
-          {/* <div className="flex justify-between mt-6 sm:mt-8">
-            {step > 1 && (
-              <button
-                onClick={() => setStep(step - 1)}
-                className="flex items-center text-yellow-600 hover:text-yellow-700 text-sm sm:text-base"
-              >
-                <ArrowLeft className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                Previous
-              </button>
-            )}
-              {step < 3 ? (
-                <button
-                  onClick={async () => {
-                    if(step === 1){
-                      setIsLoading(true);
-
-                      if(formData.email == ""){
-                        alert("Please enter your email");
-                        setIsLoading(false);
-                        return;
-                      }
-                      if(formData.id_type == ""){
-                        alert("Please enter your id number");
-                        setIsLoading(false);
-                        return;
-                      }
-                      if(formData.firstName == ""){
-                        alert("Please enter your first name");
-                        setIsLoading(false);
-                        return;
-                      var res = await api.validateEmail(formData.email);
-                      console.log(res);
-                      if(!res['exists']){
-                        // setFormData({ ...formData, email: res.email });
-                        setIsLoading(false);
-                        setStep(step + 1);
-                      }else{
-                        alert("Please enter a valid email");
-                        setIsLoading(false);
-                        return;
-                      }
-                      
-                    }
-                    else if (step === 2) {
-                      if (formData.userType === "instructor") {
-                        setIsLoading(true);
-                    
-                        if (!formData.institutionName) {
-                          alert("Please enter the institution name");
-                          setIsLoading(false);
-                          return;
-                        }
-                        if (Number(groupSize) <= 0) {
-                          alert("Please enter a valid number of people in the group");
-                          setIsLoading(false);
-                          return;
-                        }
-                        
-                        alert("Registering group with : " + formData.institutionName + " and " + groupSize + " people");
-                        // Register the group first
-                        const response = await api.registerGroup({
-                          name: formData.institutionName,
-                          group_size: Number(groupSize),
-                        });
-                        try{
-                          console.log(response);
-                          const id = response.institution.id;
-                          setFormData({ ...formData, institutionId: id });
-                          if(id){
-                            setStep(step + 1);
-                          }
-                        setIsLoading(false);
-                      if (!response) {
-                        alert("Failed to register group");
-                        return;
-                      }
-                      }catch(error){
-                        console.error("Registration failed:", error);
-                        alert(error instanceof Error ? error.message : "Registration failed");
-                      }
-                      setIsLoading(false);
-                    }
-                  }
-
-                  // Proceed to the next step
-                  // setStep(step + 1);
-                }}
-                className="ml-auto flex items-center bg-yellow-600 text-white px-4 sm:px-6 py-2 rounded-lg hover:bg-yellow-700"
-              >
-                <>
-                  Next
-                  <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 ml-1 sm:ml-2" />
-                </>
-              </button>
-            ) : null}
-          </div> */}
+          {/* Footer Info */}
+          <div className="mt-8 text-center text-sm text-gray-600">
+            <p>Your data is secure and will only be used for festival registration.</p>
+          </div>
         </div>
+
         {downloadCardPath && (
           <DownloadCardPopup
             cardPath={downloadCardPath}

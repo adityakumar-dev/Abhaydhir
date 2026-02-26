@@ -12,7 +12,6 @@ import '../../screens/help.dart';
 import '../../screens/guest list/guest_list.dart';
 import '../../screens/analytics.dart';
 import '../../screens/new entry/success.dart';
-import '../../screens/guest list/view_guest.dart';
 
 class AppRoutes {
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -39,13 +38,7 @@ class AppRoutes {
         );
       case SuccessScreen.routeName:
         return MaterialPageRoute(builder: (_) => const SuccessScreen());
-      case ViewGuestScreen.routeName:
-        final args = settings.arguments as Map<String, dynamic>;
-        return MaterialPageRoute(
-          builder: (_) => ViewGuestScreen(
-            userId: args['userId'] as String,
-          ),
-        );
+
       case DepartureScreen.routeName :
         final args = settings.arguments as Map<String, dynamic>;
         return MaterialPageRoute(

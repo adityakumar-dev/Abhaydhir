@@ -8,7 +8,7 @@ from utils.models.api_models import Tourist
 from fastapi import Form
 from utils.services.public_access_link_provider import generate_public_access_link, verify_public_access_link
 from utils.services.file_handlers import save_upload_file
-from template_generator import VisitorCardGenerator
+from template_generator import VisitorCardGenerator, VisitorCardGenerator3
 from utils.services.email_handler import send_welcome_email_background
 from utils.services.sms_handler import send_welcome_sms_background
 from utils.services.jwt_file_token import (
@@ -34,62 +34,57 @@ router = APIRouter()
 async def register_tourist(
     name: str = Form(...),
     phone: str = Form(...),
-    unique_id_type: str = Form(...),
-    unique_id: str = Form(...),
+    unique_id_type: str = Form(None),
+    unique_id: str = Form(None),
     is_group: bool = Form(...),
     group_count: int = Form(...),
     registered_event_id: int = Form(...),
     valid_date: str = Form(...),
     image: UploadFile = None,
-    
+    unique_id_photo: UploadFile = None,
     background_tasks: BackgroundTasks = None,
 ):
-
     print("Valid date : ", valid_date)
-    # change str based date to date object
+
+    # Parse valid_date
     if valid_date:
         try:
             valid_date = datetime.strptime(valid_date, "%Y-%m-%d").date()
         except ValueError:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid date format for valid_date. Use YYYY-MM-DD.")
     else:
-        # Set default valid_date if not provided
         valid_date = datetime.strptime("2026-02-27", "%Y-%m-%d").date()
-    
-    # Build registration object from form fields
-    registration = Tourist(
-        name=name,
-        phone=phone,
-        unique_id_type=unique_id_type,
-        unique_id=unique_id,
-        is_group=is_group,
-        group_count=group_count,
-        registered_event_id=registered_event_id,
-        valid_date=valid_date
-    )
-    # Build registration object from form fields
-    registration = Tourist(
-        name=name,
-        phone=phone,
-        unique_id_type=unique_id_type,
-        unique_id=unique_id,
-        is_group=is_group,
-        group_count=group_count,
-        registered_event_id=registered_event_id,
-        valid_date=valid_date
-    )
-    if hasattr(registration, "user_id"):
-        delattr(registration, "user_id")
 
     # Require image and phone
     if not image:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Image file is required")
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Profile image is required")
     if not phone:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Phone number is required")
 
-    # Basic validation
-    if not registration.name or not registration.unique_id_type or not registration.unique_id:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Missing required fields")
+    # ── ID validation: old (text) vs new (photo) ──────────────────────────────
+    has_text_id = unique_id_type and unique_id and unique_id_type.strip() and unique_id.strip()
+    has_photo_id = unique_id_photo is not None
+
+    if not has_text_id and not has_photo_id:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST,
+            "Either provide unique_id_type + unique_id (text) OR upload a unique_id_photo"
+        )
+
+    # Build registration object
+    registration = Tourist(
+        name=name,
+        phone=phone,
+        unique_id_type=unique_id_type.strip() if has_text_id else None,
+        unique_id=unique_id.strip() if has_text_id else None,
+        is_group=is_group,
+        group_count=group_count,
+        registered_event_id=registered_event_id,
+        valid_date=valid_date
+    )
+
+    if not registration.name:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Name is required")
 
     if not registration.is_group:
         registration.group_count = 1
@@ -99,47 +94,51 @@ async def register_tourist(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "group_count must be ≥ 2 for groups")
     if not registration.registered_event_id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "registered_event_id is required")
-    
+
     # Validate active event
     event_resp = supabaseAdmin.table("events").select("*").eq("is_active", True).eq("event_id", registration.registered_event_id).execute()
-    if hasattr(event_resp , 'error'):
+    if not event_resp.data:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid or inactive event")
     event_data = event_resp.data[0]
-    
+
     # Insert tourist
     try:
-        reg_dict = registration.dict()
-        # Convert valid_date to string if it's a date object
+        reg_dict = registration.dict(exclude={"user_id"})  # Exclude auto-generated user_id
         if isinstance(reg_dict.get("valid_date"), datetime):
             reg_dict["valid_date"] = reg_dict["valid_date"].strftime("%Y-%m-%d")
         elif hasattr(reg_dict.get("valid_date"), "isoformat"):
             reg_dict["valid_date"] = reg_dict["valid_date"].isoformat()
 
         insert_resp = supabaseAdmin.table("tourists").insert(reg_dict).execute()
-        if hasattr(insert_resp, "error") or not insert_resp.data:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Error registering: {insert_resp.error.message}")
+        if not insert_resp.data:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Error registering tourist")
         user_id = insert_resp.data[0]["user_id"]
 
-        # QR + Image save
-        code = short_url_generator()
-        qr_code = code
+        # Save profile image
         image_path = save_upload_file(image, prefix=f"tourist_{user_id}")
 
+        # Save unique ID photo (if provided via photo route)
+        unique_id_path = None
+        if has_photo_id:
+            unique_id_path = save_upload_file(unique_id_photo, prefix=f"uid_{user_id}", is_id=True)
+
+        # Generate QR short code
+        code = short_url_generator()
+
+        # Save meta (profile image + QR + optional ID photo path)
         meta_resp = supabaseAdmin.table("tourist_meta").insert({
             "user_id": user_id,
             "qr_code": code,
-            "image_path": image_path
+            "image_path": image_path,
+            "unique_id_path": unique_id_path,
         }).execute()
-        if hasattr(meta_resp, 'error'):
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Error saving meta: {meta_resp.error.message}")
+        if not meta_resp.data:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Error saving meta")
 
-        
-        # Deterministic temp-card path — same user always maps to the same file
+        # Generate visitor card token & short link
         card_temp_path = f"{TEMP_CARD_DIR}/card_temp_{user_id}.png"
         card_public_url = None
-        visitor_card_token = None
         try:
-
             visitor_card_token = generate_card_token(
                 user_id=user_id,
                 user_name=registration.name,
@@ -147,93 +146,63 @@ async def register_tourist(
                 valid_dates=str(valid_date),
                 card_temp_path=card_temp_path,
             )
-            #generate the short code 
-            
-            # insert card token to supabase for short url generation and validation later
-            supabaseAdmin.table('short_links').insert({
-                'short_code': code,
-                'token': visitor_card_token
-
+            supabaseAdmin.table("short_links").insert({
+                "short_code": code,
+                "token": visitor_card_token
             }).execute()
             card_public_url = f"/tourists/visitor-card/{visitor_card_token}"
-            
-            # # also email for testing 
-            # if True and background_tasks:
-            #     send_welcome_email_background(
-            #         background_tasks=background_tasks,
-                  
-            #         user_email = os.getenv("TEST_WELCOME_EMAIL"),
-            #         user_name= registration.name,
-            #         visitor_card_path = card_temp_path,
-            #         event_name = event_data.get("name", "Event"),
-            #         valid_dates = valid_date,
-            #         extra_info = {
-            #             "short_code" : code,
-            #         }
 
+            # if phone and background_tasks:
+            #     send_welcome_sms_background(
+            #         background_tasks=background_tasks,
+            #         to=phone,
+            #         event_name="वसंतोत्सव 2026",
+            #         e_id=str(code),
+            #         valid_date=str(valid_date),
+            #         short_code=code
             #     )
-            if phone and background_tasks:
-                send_welcome_sms_background(
-                    background_tasks=background_tasks,
-                    to=phone,
-                    event_name="वसंतोत्सव 2026",
-                    e_id=str(code),
-                    valid_date=valid_date,
-                    short_code=code
-                )
         except Exception as e:
             print(f"Error generating visitor card token: {e}")
             card_public_url = None
-        
-        print({
-            "message": "Tourist registered successfully",
-            "tourist": insert_resp.data[0],
-            "meta": meta_resp.data[0] if meta_resp.data else None,
-            "visitor_card_url": card_public_url,
-            "sms_sent": phone is not None,
-        })
 
         return {
             "message": "Tourist registered successfully",
             "tourist": insert_resp.data[0],
             "meta": meta_resp.data[0] if meta_resp.data else None,
             "visitor_card_url": card_public_url,
+            "id_verification_mode": "text" if has_text_id else "photo",
             "sms_sent": phone is not None,
         }
-    except Exception as e:
-        # Normalize exception text
-        err_text = str(e)
 
-        # Handle PostgreSQL unique-constraint violation (duplicate key -> SQLSTATE 23505)
-        if 'duplicate key value violates unique constraint' in err_text or '23505' in err_text or 'already exists' in err_text:
+    except Exception as e:
+        err_text = str(e)
+        if "duplicate key value violates unique constraint" in err_text or "23505" in err_text or "already exists" in err_text:
             try:
                 import re
                 m = re.search(r"Key \((?P<field>[^)]+)\)=\((?P<value>[^)]+)\)", err_text)
                 if m:
-                    field = m.group('field')
-                    value = m.group('value')
+                    field = m.group("field")
+                    value = m.group("value")
                     friendly = f"{field.replace('_', ' ').capitalize()} '{value}' already registered"
                 else:
-                    # Fallback to parsing constraint name
                     m2 = re.search(r'constraint "(?P<constraint>[^"]+)"', err_text)
                     if m2:
-                        constraint = m2.group('constraint')
-                        if 'phone' in constraint:
-                            friendly = 'Phone number already registered'
-                        elif 'email' in constraint:
-                            friendly = 'Email already registered'
-                        else:
-                            friendly = 'Duplicate value already exists'
+                        constraint = m2.group("constraint")
+                        friendly = "Phone number already registered for this date" if "phone" in constraint else "Duplicate value already exists"
                     else:
-                        friendly = 'Duplicate value already exists'
+                        friendly = "Duplicate value already exists"
             except Exception:
-                friendly = 'Duplicate value already exists'
-
-            # Preserve existing error-response structure expected by frontend
+                friendly = "Duplicate value already exists"
             raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Error registering tourist: {friendly}")
 
-        # Unknown error — preserve original format
         raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Error registering tourist: {err_text}")
+
+# ────────────────────────────────────────────────────────────────────────────
+# Quick card renewal endpoints are in quick_route.py:
+# - POST /quick/renew-by-shortcode (fastest renewal)
+# - POST /quick/renew-by-phone (alternative renewal)
+# ────────────────────────────────────────────────────────────────────────────
+
 # ------------------------------------------------------------
 # GET ALL TOURISTS (Admin only, Paginated)
 # ------------------------------------------------------------
@@ -241,15 +210,17 @@ async def register_tourist(
 async def get_all_tourists(
     limit: int = 20,
     offset: int = 0,
+    date_filter: str = Query(None, alias="date", description="Filter by valid_date (YYYY-MM-DD). Defaults to today."),
     user=Depends(jwt_middleware)
 ):
     """
-    Get all tourists with today's entry status
-    Includes active status to show on UI
+    Get all tourists with today's entry status, filtered by valid_date.
+    Pass ?date=YYYY-MM-DD to view a specific date's tourists.
     """
     from datetime import date
     today = str(date.today())
-    
+    filter_date = date_filter or today
+
     if user.get("role") != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -259,6 +230,7 @@ async def get_all_tourists(
     resp = (
         supabaseAdmin.table("tourists")
         .select("*")
+        .eq("valid_date", filter_date)
         .range(offset, offset + limit - 1)
         .order("user_id", desc=True)
         .execute()
@@ -353,30 +325,28 @@ async def get_tourists_by_event(
     event_id: int,
     limit: int = 20,
     offset: int = 0,
+    date_filter: str = Query(None, alias="date", description="Filter by valid_date (YYYY-MM-DD). Defaults to today."),
     user=Depends(check_guard_admin_access)
 ):
     """
-    Fetch tourists for an event with ONLY TODAY'S entry status.
-    
+    Fetch tourists for an event filtered by valid_date (defaults to today).
+    Pass ?date=YYYY-MM-DD to view tourists for a specific date.
+
     Key behavior:
-    - Only shows current day (today's) entry information
-    - If tourist entered yesterday but didn't exit, they won't show as "inside"
+    - Only shows tourists whose valid_date matches the requested date
+    - Entry status (inside/outside) is based on today's actual entry records
     - "Currently inside" means: entered TODAY and no departure recorded TODAY
-    - Old days data is completely ignored for the "inside" status
-    
-    Returns clear separation between:
-    - Total tourist registrations (records) vs Total members (actual people)
-    - Groups vs Individuals  
-    - Currently inside (both registration count and people count)
     """
     from datetime import date
     today = str(date.today())
-    
-    # Fetch tourists for the event
+    filter_date = date_filter or today
+
+    # Fetch tourists for the event filtered by valid_date
     resp = (
         supabaseAdmin.table("tourists")
         .select("*")
         .eq("registered_event_id", event_id)
+        .eq("valid_date", filter_date)
         .range(offset, offset + limit - 1)
         .order("user_id", desc=True)
         .execute()
@@ -388,12 +358,13 @@ async def get_tourists_by_event(
         )
 
     tourist_ids = [t["user_id"] for t in resp.data]
-    
-    # Get total counts for ALL tourists in this event (not just current page)
+
+    # Get total counts for tourists in this event for the filtered date
     all_tourists_resp = (
         supabaseAdmin.table("tourists")
         .select("user_id, is_group, group_count")
         .eq("registered_event_id", event_id)
+        .eq("valid_date", filter_date)
         .execute()
     )
     
@@ -500,7 +471,8 @@ async def get_tourists_by_event(
                 "limit": limit,
                 "offset": offset,
                 "count": 0,
-                "total": total_tourist_registrations
+                "total": total_tourist_registrations,
+                "date": filter_date
             }
         }
 
@@ -565,7 +537,8 @@ async def get_tourists_by_event(
             "limit": limit,
             "offset": offset,
             "count": len(resp.data),
-            "total": total_tourist_registrations
+            "total": total_tourist_registrations,
+            "date": filter_date
         }
     }
     print(response_data)
@@ -577,95 +550,136 @@ async def get_tourists_by_event(
 @router.get("/{user_id}", status_code=status.HTTP_200_OK)
 async def get_tourist(user_id: int, user=Depends(jwt_middleware)):
     """
-    Get single tourist with complete entry history and today's status
+    Get single tourist with entry data organized by date.
+
+    Response shape:
+    {
+      "tourist": {
+        "user": { ...tourist row... },
+        "meta": { ...tourist_meta row..., "image_token": "...", "image_url": "..." },
+        "today": "2026-02-26",
+        "dates": {
+          "2026-02-27": {
+            "has_entry": false,
+            "is_currently_inside": false,
+            "entry_record": null,
+            "entry_items": [],
+            "total_entries": 0,
+            "open_entries": 0,
+            "last_entry": null
+          },
+          "2026-02-28": { ... },
+          "2026-03-01": { ... }
+        }
+      }
+    }
     """
     from datetime import date
     today = str(date.today())
-    
+
+    # Event dates for the festival — all possible dates a visitor could have
+    EVENT_DATES = ["2026-02-27", "2026-02-28", "2026-03-01"]
+
     if user.get("role") not in ["admin", "security"]:
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "Not allowed")
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Not allowed")
 
     tourist_resp = supabaseAdmin.table("tourists").select("*").eq("user_id", user_id).single().execute()
-    if hasattr(tourist_resp, 'error') and tourist_resp.error:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Error fetching tourist: {tourist_resp.error.message}")
+    if not tourist_resp.data:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, f"Tourist {user_id} not found")
 
-    tourist_event_id = tourist_resp.data['registered_event_id']
-    # check guard has allowed to seee or not 
-    event_resp =supabaseAdmin.table("events").select("*").eq("event_id", tourist_event_id).single().execute()
-    if hasattr(event_resp,'error'):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Event not found")
+    tourist_event_id = tourist_resp.data["registered_event_id"]
+
+    # Security guard access check
+    event_resp = supabaseAdmin.table("events").select("allowed_guards").eq("event_id", tourist_event_id).single().execute()
+    if not event_resp.data:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Event not found")
+
     allowed_guards = event_resp.data.get("allowed_guards") or []
-
-    uid = user.get('uid') or user.get('sub')
-    print(uid);
-    print(allowed_guards);
-    if allowed_guards != []:
-        if (user['role'] == "security" and uid not in allowed_guards) :
+    uid = user.get("uid") or user.get("sub")
+    if allowed_guards:
+        if user["role"] == "security" and uid not in allowed_guards:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You are not authorized to access this event.",
             )
+
+    # Fetch meta
     meta_resp = supabaseAdmin.table("tourist_meta").select("*").eq("user_id", user_id).execute()
-    
-    # Get all entry records
-    entries_resp = supabaseAdmin.table("entry_records").select("*").eq("user_id", user_id).order("entry_date", desc=True).execute()
-    
-    # Get today's entry record specifically
-    today_entry_resp = supabaseAdmin.table("entry_records").select("*").eq("user_id", user_id).eq("entry_date", today).execute()
-    
-    today_entry_data = None
-    if hasattr(today_entry_resp, 'data') and today_entry_resp.data:
-        today_record = today_entry_resp.data[0]
-        record_id = today_record["record_id"]
-        
-        # Get entry_items for today
-        items_resp = supabaseAdmin.table("entry_items").select("*").eq("record_id", record_id).order("arrival_time", desc=True).execute()
-        
-        entry_items = items_resp.data if hasattr(items_resp, 'data') else []
-        open_entries = [item for item in entry_items if item.get("departure_time") is None]
-        
-        today_entry_data = {
-            "has_entry_today": True,
-            "is_currently_inside": len(open_entries) > 0,
-            "entry_record": today_record,
-            "entry_items": entry_items,
-            "total_entries_today": len(entry_items),
-            "open_entries": len(open_entries),
-            "last_entry": entry_items[0] if entry_items else None
-        }
-    else:
-        today_entry_data = {
-            "has_entry_today": False,
-            "is_currently_inside": False,
-            "entry_record": None,
-            "entry_items": [],
-            "total_entries_today": 0,
-            "open_entries": 0,
-            "last_entry": None
-        }
+    meta = meta_resp.data[0] if meta_resp.data else None
 
-    data = {
-        "user": tourist_resp.data,
-        "meta": meta_resp.data[0] if meta_resp.data else None,
-        "all_entry_records": entries_resp.data if entries_resp.data else [],
-        "today_entry": today_entry_data
+    # Add secure image token to meta
+    image_token = None
+    if meta and meta.get("image_path"):
+        image_path = meta["image_path"]
+        if os.path.exists(image_path):
+            image_token = generate_user_image_token(image_path, user_id, expires_in=86400 * 30)
+            meta["image_token"] = image_token
+            meta["image_url"] = f"/tourists/user-image/{image_token}"
+
+    # Fetch ALL entry records for this user across all dates in one query
+    all_records_resp = (
+        supabaseAdmin.table("entry_records")
+        .select("*")
+        .eq("user_id", user_id)
+        .in_("entry_date", EVENT_DATES)
+        .order("entry_date", desc=False)
+        .execute()
+    )
+    all_records = all_records_resp.data or []
+
+    # Build a map: entry_date -> record
+    records_by_date = {r["entry_date"]: r for r in all_records}
+
+    # Fetch ALL entry_items for all those records in one query
+    record_ids = [r["record_id"] for r in all_records]
+    items_by_record = {}
+    if record_ids:
+        all_items_resp = (
+            supabaseAdmin.table("entry_items")
+            .select("*")
+            .in_("record_id", record_ids)
+            .order("arrival_time", desc=False)
+            .execute()
+        )
+        for item in (all_items_resp.data or []):
+            rid = item["record_id"]
+            items_by_record.setdefault(rid, []).append(item)
+
+    # Build date-keyed response
+    dates_data = {}
+    for d in EVENT_DATES:
+        record = records_by_date.get(d)
+        if record:
+            items = items_by_record.get(record["record_id"], [])
+            open_entries = [i for i in items if i.get("departure_time") is None]
+            dates_data[d] = {
+                "has_entry": True,
+                "is_currently_inside": len(open_entries) > 0,
+                "entry_record": record,
+                "entry_items": items,
+                "total_entries": len(items),
+                "open_entries": len(open_entries),
+                "last_entry": items[-1] if items else None
+            }
+        else:
+            dates_data[d] = {
+                "has_entry": False,
+                "is_currently_inside": False,
+                "entry_record": None,
+                "entry_items": [],
+                "total_entries": 0,
+                "open_entries": 0,
+                "last_entry": None
+            }
+
+    return {
+        "tourist": {
+            "user": tourist_resp.data,
+            "meta": meta,
+            "today": today,
+            "dates": dates_data
+        }
     }
-
-    # Add secure image URL with JWT token
-    if data["meta"] and data["meta"].get("image_path"):
-        image_path = data["meta"]["image_path"]
-        
-        # Generate JWT token for secure image access (30 days validity)
-        image_token = generate_user_image_token(image_path, user_id, expires_in=86400 * 30)
-        
-        # Add both the JWT-protected URL and legacy public URL (for backward compatibility)
-        data["image_token"] = image_token
-        
-    
-    print(f"Image tokens is : {image_token}")
-    
-    print(data)
-    return {"tourist": data}
 
 # ------------------------------------------------------------
 # GET USER IMAGE WITH JWT TOKEN (Public Access)
@@ -822,7 +836,7 @@ async def _get_or_generate_card_path(user_id: int, card_temp_path: str, valid_da
         "group_count":         tourist.get("group_count", 1),
     }
 
-    generator = VisitorCardGenerator()
+    generator = VisitorCardGenerator3()
     card_bytes = generator.generate_card_in_memory(card_data)
 
     # Write to a tmp file first, then rename — prevents half-written files being served
@@ -878,7 +892,6 @@ async def resolve_short_url(short_code: str):
         
         short_link = short_link_resp.data
         token = short_link.get("token")
-        user_id = short_link.get("user_id")
         
         if not token:
             raise HTTPException(
@@ -886,7 +899,7 @@ async def resolve_short_url(short_code: str):
                 detail="Invalid short link: missing token"
             )
         
-        # Verify token is still valid (check expiry)
+        # Verify token is still valid and extract payload fields
         try:
             payload = verify_file_token(token, expected_type="visitor_card")
         except jwt.ExpiredSignatureError:
@@ -900,11 +913,20 @@ async def resolve_short_url(short_code: str):
                 detail="Invalid token in short link"
             )
         
+        # user_id, user_name, valid_date etc. all live inside the JWT payload
+        user_id       = payload.get("user_id")
+        user_name     = payload.get("user_name", "")
+        valid_date    = payload.get("valid_date", "")
+        event_name    = payload.get("event_name", "")
+
         # Return both URLs so frontend can decide what to do
         return {
             "success": True,
             "short_code": short_code,
             "user_id": user_id,
+            "user_name": user_name,
+            "valid_date": valid_date,
+            "event_name": event_name,
             "card_urls": {
                 "preview": f"/tourists/visitor-card/{token}",
                 "download": f"/tourists/visitor-card/{token}?download=true"

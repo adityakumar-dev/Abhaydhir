@@ -136,7 +136,8 @@ class _GuestProfileDetailState extends State<GuestProfileDetail> {
   }
 
   Widget _buildProfileHeader(Map<String, dynamic> tourist) {
-    final imageUrl = tourist['image_path'] as String?;
+    final imageUrl = (tourist['image_path'] ?? '').toString();
+    final uniqueIdUrl = (tourist['unique_id_path'] ?? '').toString();
     final name = (tourist['name'] ?? 'Unknown').toString();
     final phone = (tourist['phone'] ?? 'N/A').toString();
     final validDate = (tourist['valid_date'] ?? 'N/A').toString();
@@ -159,21 +160,99 @@ class _GuestProfileDetailState extends State<GuestProfileDetail> {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // Photo
-          if (imageUrl != null && imageUrl.isNotEmpty)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                imageUrl,
-                width: 120,
-                height: 120,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) =>
-                    _buildPhotoPlaceholder(),
+          // Photos row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Profile photo
+              Column(
+                children: [
+                  GestureDetector(
+                    onTap: imageUrl.isNotEmpty
+                        ? () => _showImageDialog('Profile Photo', imageUrl)
+                        : null,
+                    child: Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: imageUrl.isNotEmpty
+                              ? Image.network(
+                                  imageUrl,
+                                  width: 110,
+                                  height: 110,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => _buildPhotoPlaceholder(110),
+                                )
+                              : _buildPhotoPlaceholder(110),
+                        ),
+                        if (imageUrl.isNotEmpty)
+                          Positioned(
+                            bottom: 4,
+                            right: 4,
+                            child: Container(
+                              padding: const EdgeInsets.all(3),
+                              decoration: BoxDecoration(
+                                color: Colors.black45,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Icon(Icons.zoom_in, color: Colors.white, size: 14),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Profile Photo',
+                    style: TextStyle(color: Colors.white70, fontSize: 11),
+                  ),
+                ],
               ),
-            )
-          else
-            _buildPhotoPlaceholder(),
+              // Unique ID photo (only shown if available)
+              if (uniqueIdUrl.isNotEmpty) ...
+                [
+                  const SizedBox(width: 16),
+                  Column(
+                    children: [
+                      GestureDetector(
+                        onTap: () => _showImageDialog('ID Document', uniqueIdUrl),
+                        child: Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(
+                                uniqueIdUrl,
+                                width: 110,
+                                height: 110,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => _buildIdPlaceholder(),
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 4,
+                              right: 4,
+                              child: Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: BoxDecoration(
+                                  color: Colors.black45,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Icon(Icons.zoom_in, color: Colors.white, size: 14),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'ID Document',
+                        style: TextStyle(color: Colors.white70, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ],
+            ],
+          ),
           const SizedBox(height: 16),
 
           // Name
@@ -248,10 +327,10 @@ class _GuestProfileDetailState extends State<GuestProfileDetail> {
     );
   }
 
-  Widget _buildPhotoPlaceholder() {
+  Widget _buildPhotoPlaceholder([double size = 120]) {
     return Container(
-      width: 120,
-      height: 120,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.2),
         borderRadius: BorderRadius.circular(12),
@@ -260,6 +339,124 @@ class _GuestProfileDetailState extends State<GuestProfileDetail> {
         Icons.person,
         color: Colors.white,
         size: 60,
+      ),
+    );
+  }
+
+  Widget _buildIdPlaceholder() {
+    return Container(
+      width: 110,
+      height: 110,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Icon(
+        Icons.badge_outlined,
+        color: Colors.white,
+        size: 48,
+      ),
+    );
+  }
+
+  void _showImageDialog(String title, String imageUrl) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Title bar
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF00897B), Color(0xFF26A69A)],
+                ),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(ctx),
+                    child: const Icon(Icons.close, color: Colors.white, size: 22),
+                  ),
+                ],
+              ),
+            ),
+            // Image
+            Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.65,
+              ),
+              decoration: const BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                ),
+                child: InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: Image.network(
+                    imageUrl,
+                    fit: BoxFit.contain,
+                    loadingBuilder: (context, child, progress) {
+                      if (progress == null) return child;
+                      return SizedBox(
+                        height: 200,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            value: progress.expectedTotalBytes != null
+                                ? progress.cumulativeBytesLoaded /
+                                    progress.expectedTotalBytes!
+                                : null,
+                            color: const Color(0xFF00897B),
+                          ),
+                        ),
+                      );
+                    },
+                    errorBuilder: (_, __, ___) => const SizedBox(
+                      height: 200,
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.broken_image, color: Colors.white54, size: 48),
+                            SizedBox(height: 8),
+                            Text('Failed to load image',
+                                style: TextStyle(color: Colors.white54)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

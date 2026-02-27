@@ -328,6 +328,7 @@ class ServerApi {
   logger.i('Response body: ${response.body}');
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        logger.i("${data['tourist']}"); // Log the tourist data
         return data['tourist'] as Map<String, dynamic>;
       } else {
         _handleError('getTouristById', response.body);
@@ -863,7 +864,7 @@ class ServerApi {
       if (response.statusCode == 200) {
         final result = jsonDecode(response.body);
         
-        logger.i('Tourist profile data received successfully ${result.toString()}');
+        logger.i('Tourist profile data received successfully ${result['tourist']['unique_id_path']}');
         return result;
       } else if (response.statusCode == 404) {
         throw Exception('Tourist not found');

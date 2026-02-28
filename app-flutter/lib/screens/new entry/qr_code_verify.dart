@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:spring_admin/providers/event_provider.dart';
 import 'package:spring_admin/apis/server_api.dart';
 import 'package:spring_admin/utils/event_required_mixin.dart';
-import 'dart:convert';
 import 'renew_card.dart';
 
 class QrCodeVerifyScreen extends StatefulWidget {
@@ -93,7 +92,6 @@ class _QrCodeVerifyScreenState extends State<QrCodeVerifyScreen> with EventRequi
           ),
           _buildOverlay(),
           if (error != null) _buildErrorOverlay(),
-          if (isProcessing) _buildLoadingOverlay(),
         ],
       ),
     );
@@ -110,29 +108,12 @@ class _QrCodeVerifyScreenState extends State<QrCodeVerifyScreen> with EventRequi
     });
 
     try {
-      // Parse QR code - expecting format: TOURIST-{user_id}-{unique_id}
       final qrCodeValue = barcodes[0].rawValue?.toString() ?? '';
       debugPrint("Scanned QR code: $qrCodeValue");
 
-      // Extract user ID from QR code
-      int userId;
-      if (qrCodeValue.startsWith('TOURIST-')) {
-        final parts = qrCodeValue.split('-');
-        if (parts.length >= 2) {
-          userId = int.parse(parts[1]);
-        } else {
-          throw Exception('Invalid QR code format');
-        }
-      } else {
-        // Fallback: try to parse as JSON
-        try {
-          final qrData = json.decode(qrCodeValue);
-          userId = int.parse(qrData['user_id'].toString());
-        } catch (e) {
-          throw Exception('Invalid QR code format. Expected TOURIST-{id}-{unique_id}');
-        }
+      if (qrCodeValue.isEmpty) {
+        throw Exception('Empty QR code scanned');
       }
-
 
       // Check if event is loaded
       if (_currentEventId == null) {
@@ -143,23 +124,22 @@ class _QrCodeVerifyScreenState extends State<QrCodeVerifyScreen> with EventRequi
       if (!context.mounted) return;
       _showLoadingDialog(context, 'Registering entry...');
 
-      // Create entry using ServerApi with loaded event info
-      final result = await ServerApi.createEntry(
-        userId: userId,
+      // Create entry using short code (same as manual entry)
+      final result = await ServerApi.createEntryWithCode(
+        shortCode: qrCodeValue,
         eventId: _currentEventId!,
-        entryType: 'normal',
       );
 
       if (!context.mounted) return;
       Navigator.pop(context); // Close loading dialog
 
-      if (result != null && result['message'] != null) {
-        _showSuccessDialog(result);
-        // Reset scanner state
+      if (result != null) {
+        // Reset scanner state before showing dialog
         setState(() {
           isProcessing = false;
           is_detected = false;
         });
+        _showSuccessDialog(result);
       } else {
         throw Exception('Failed to create entry');
       }
@@ -174,15 +154,15 @@ class _QrCodeVerifyScreenState extends State<QrCodeVerifyScreen> with EventRequi
         errorMsg = errorMsg.substring(11);
       }
 
-      if (context.mounted) {
-        _showErrorDialog(errorMsg);
-      }
-
-      // Reset processing state
+      // Reset processing state before showing dialog
       setState(() {
         isProcessing = false;
         is_detected = false;
       });
+
+      if (context.mounted) {
+        _showErrorDialog(errorMsg);
+      }
     }
   }
 
@@ -349,11 +329,11 @@ class _QrCodeVerifyScreenState extends State<QrCodeVerifyScreen> with EventRequi
     final isReentry = result['is_reentry'] ?? false;
     final entryNumber = result['entry_number'] ?? 1;
     final totalEntries = result['total_entries_today'] ?? 1;
-    final name = result['name'] ?? 'Tourist';
-    final phone = result['phone'] ?? 'N/A';
+    final name = result['name']?.toString() ?? 'Tourist';
+    final phone = result['phone']?.toString() ?? 'N/A';
     final isGroup = result['is_group'] ?? false;
     final groupCount = result['group_count'] ?? 1;
-    final message = result['message'] ?? 'Entry registered successfully';
+    final message = result['message']?.toString() ?? 'Entry registered successfully';
 
     showDialog(
       context: context,
@@ -790,31 +770,6 @@ class _QrCodeVerifyScreenState extends State<QrCodeVerifyScreen> with EventRequi
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLoadingOverlay() {
-    return Container(
-      color: Colors.black54,
-      child: const Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-            ),
-            SizedBox(height: 16),
-            Text(
-              'Verifying QR Code...',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
         ),
       ),
     );

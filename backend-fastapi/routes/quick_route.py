@@ -239,16 +239,16 @@ async def renew_card_by_shortcode(
             card_public_url = None
 
         # SMS sending would go here via background_tasks if enabled
-        # if phone and background_tasks:
-        #     from utils.services.sms_handler import send_welcome_sms_background
-        #     send_welcome_sms_background(
-        #         background_tasks=background_tasks,
-        #         to=phone,
-        #         event_name="वसंतोत्सव 2026",
-        #         e_id=str(new_qr_code),
-        #         valid_date=str(valid_date_obj),
-        #         short_code=new_qr_code
-        #     )
+        if phone and background_tasks:
+            from utils.services.sms_handler import send_welcome_sms_background
+            send_welcome_sms_background(
+                background_tasks=background_tasks,
+                to=phone,
+                event_name="वसंतोत्सव 2026",
+                e_id=str(new_qr_code),
+                valid_date=str(valid_date_obj),
+                short_code=new_qr_code
+            )
 
         return {
             "message": "Card renewed successfully!",
@@ -361,6 +361,7 @@ async def renew_card_by_phone(
         )
         
         if already_registered_resp.data:
+            print(f"User with phone {phone} is already registered for date {valid_date} {already_registered_resp.data}")
             raise HTTPException(
                 status.HTTP_409_CONFLICT,
                 f"You are already registered for {valid_date}. No need to renew."
@@ -460,16 +461,16 @@ async def renew_card_by_phone(
             card_public_url = None
 
         # SMS sending would go here via background_tasks if enabled
-        # if phone and background_tasks:
-        #     from utils.services.sms_handler import send_welcome_sms_background
-        #     send_welcome_sms_background(
-        #         background_tasks=background_tasks,
-        #         to=phone,
-        #         event_name="वसंतोत्सव 2026",
-        #         e_id=str(new_qr_code),
-        #         valid_date=str(valid_date_obj),
-        #         short_code=new_qr_code
-        #     )
+        if phone and background_tasks:
+            from utils.services.sms_handler import send_welcome_sms_background
+            send_welcome_sms_background(
+                background_tasks=background_tasks,
+                to=phone,
+                event_name="वसंतोत्सव 2026",
+                e_id=str(new_qr_code),
+                valid_date=str(valid_date_obj),
+                short_code=new_qr_code
+            )
 
         return {
             "message": "Card renewed successfully",

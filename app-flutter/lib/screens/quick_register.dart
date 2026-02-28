@@ -27,13 +27,11 @@ class _QuickRegisterScreenState extends State<QuickRegisterScreen> with EventReq
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _countController = TextEditingController();
-  String _registrationType = 'individual';
-  String _selectedValidDate = '2026-02-27';
+  final _countController = TextEditingController(text: '1');
+  String _selectedValidDate = '2026-02-28';
   File? _uniqueIdPhotoFile;
 
   static const List<Map<String, String>> _validDates = [
-    {'label': 'Feb 27', 'value': '2026-02-27'},
     {'label': 'Feb 28', 'value': '2026-02-28'},
     {'label': 'Mar 1',  'value': '2026-03-01'},
   ];
@@ -73,134 +71,162 @@ class _QuickRegisterScreenState extends State<QuickRegisterScreen> with EventReq
   //   }
   // }
 
-  Widget _buildRegistrationTypeSelector() {
+  Widget _buildPeopleCountSelector() {
+    final count = int.tryParse(_countController.text) ?? 1;
+    final isGroup = count > 1;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Registration Type',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF1A237E),
-          ),
-        ),
-        const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _registrationType = 'individual';
-                    _countController.clear();
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    color: _registrationType == 'individual'
-                        ? const Color.fromARGB(255, 10, 128, 120)
-                        : Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _registrationType == 'individual'
-                          ? const Color.fromARGB(255, 10, 128, 120)
-                          : Colors.grey.shade200,
-                    ),
-                    boxShadow: _registrationType == 'individual'
-                        ? [
-                            BoxShadow(
-                              color: const Color.fromARGB(255, 10, 128, 120).withOpacity(0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
-                            )
-                          ]
-                        : null,
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.person,
-                        size: 24,
-                        color: _registrationType == 'individual'
-                            ? Colors.white
-                            : Colors.grey.shade400,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Individual',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: _registrationType == 'individual'
-                              ? Colors.white
-                              : Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+            Icon(
+              isGroup ? Icons.groups_rounded : Icons.person_rounded,
+              size: 16,
+              color: const Color(0xFF1A237E),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              isGroup ? 'Group Registration' : 'Individual Registration',
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1A237E),
               ),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _registrationType = 'group';
-                  });
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    color: _registrationType == 'group'
-                        ? const Color.fromARGB(255, 10, 128, 120)
-                        : Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: _registrationType == 'group'
-                          ? const Color.fromARGB(255, 10, 128, 120)
-                          : Colors.grey.shade200,
-                    ),
-                    boxShadow: _registrationType == 'group'
-                        ? [
-                            BoxShadow(
-                              color: const Color.fromARGB(255, 10, 128, 120).withOpacity(0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
-                            )
-                          ]
-                        : null,
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.group,
-                        size: 24,
-                        color: _registrationType == 'group'
-                            ? Colors.white
-                            : Colors.grey.shade400,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Group',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: _registrationType == 'group'
-                              ? Colors.white
-                              : Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
+            const SizedBox(width: 8),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: isGroup
+                    ? const Color(0xFF00897B).withOpacity(0.12)
+                    : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                isGroup ? 'Group' : 'Individual',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isGroup ? const Color(0xFF00897B) : Colors.grey.shade500,
                 ),
               ),
             ),
           ],
         ),
+        const SizedBox(height: 4),
+        Text(
+          'Set to 1 for individual, or more for group',
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            // Decrement button
+            _buildCounterButton(
+              icon: Icons.remove_rounded,
+              onTap: count > 1
+                  ? () => setState(() {
+                        _countController.text = (count - 1).toString();
+                      })
+                  : null,
+            ),
+            // Count display / text field
+            Expanded(
+              child: TextFormField(
+                controller: _countController,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: isGroup ? const Color(0xFF00897B) : const Color(0xFF1A237E),
+                ),
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: isGroup
+                          ? const Color(0xFF00897B).withOpacity(0.4)
+                          : Colors.grey.shade200,
+                    ),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(
+                        color: Color(0xFF00897B), width: 2),
+                  ),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Colors.redAccent),
+                  ),
+                  focusedErrorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide:
+                        const BorderSide(color: Colors.redAccent, width: 2),
+                  ),
+                  // suffixText: 'people',
+                  suffixStyle:
+                      TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                ),
+                onChanged: (_) => setState(() {}),
+                validator: (value) {
+                  final n = int.tryParse(value ?? '');
+                  if (n == null || n < 1) return 'Minimum 1 person';
+                  return null;
+                },
+              ),
+            ),
+            // Increment button
+            _buildCounterButton(
+              icon: Icons.add_rounded,
+              onTap: () => setState(() {
+                _countController.text = (count + 1).toString();
+              }),
+            ),
+          ],
+        ),
       ],
+    );
+  }
+
+  Widget _buildCounterButton({required IconData icon, VoidCallback? onTap}) {
+    final enabled = onTap != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: 48,
+        height: 48,
+        margin: const EdgeInsets.symmetric(horizontal: 8),
+        decoration: BoxDecoration(
+          color: enabled
+              ? const Color(0xFF00897B)
+              : Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: enabled
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF00897B).withOpacity(0.3),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3),
+                  )
+                ]
+              : null,
+        ),
+        child: Icon(
+          icon,
+          color: enabled ? Colors.white : Colors.grey.shade400,
+          size: 22,
+        ),
+      ),
     );
   }
 
@@ -342,56 +368,54 @@ class _QuickRegisterScreenState extends State<QuickRegisterScreen> with EventReq
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 // Event Selection Banner
-                                if (registeredEventName != null)
-                                  Container(
-                                    margin: const EdgeInsets.only(bottom: 16),
-                                    padding: const EdgeInsets.all(12),
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          const Color.fromARGB(255, 10, 128, 120),
-                                          const Color.fromARGB(255, 10, 128, 120).withOpacity(0.8),
-                                        ],
-                                      ),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        const Icon(Icons.event, color: Colors.white, size: 20),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              const Text(
-                                                'Registering for:',
-                                                style: TextStyle(
-                                                  color: Colors.white70,
-                                                  fontSize: 11,
-                                                ),
-                                              ),
-                                              Text(
-                                                registeredEventName!,
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 15,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        // IconButton(
-                                        //   icon: const Icon(Icons.edit, color: Colors.white, size: 20),
-                                        //   onPressed: _showEventSelector,
-                                        //   tooltip: 'Change Event',
-                                        // ),
-                                      ],
-                                    ),
-                                  ),
+                                // if (registeredEventName != null)
+                                //   Container(
+                                //     margin: const EdgeInsets.only(bottom: 16),
+                                //     padding: const EdgeInsets.all(12),
+                                //     decoration: BoxDecoration(
+                                //       gradient: LinearGradient(
+                                //         colors: [
+                                //           const Color.fromARGB(255, 10, 128, 120),
+                                //           const Color.fromARGB(255, 10, 128, 120).withOpacity(0.8),
+                                //         ],
+                                //       ),
+                                //       borderRadius: BorderRadius.circular(8),
+                                //     ),
+                                //     child: Row(
+                                //       children: [
+                                //         const Icon(Icons.event, color: Colors.white, size: 20),
+                                //         const SizedBox(width: 8),
+                                //         Expanded(
+                                //           child: Column(
+                                //             crossAxisAlignment: CrossAxisAlignment.start,
+                                //             children: [
+                                //               const Text(
+                                //                 'Registering for:',
+                                //                 style: TextStyle(
+                                //                   color: Colors.white70,
+                                //                   fontSize: 11,
+                                //                 ),
+                                //               ),
+                                //               Text(
+                                //                 registeredEventName!,
+                                //                 style: const TextStyle(
+                                //                   color: Colors.white,
+                                //                   fontSize: 15,
+                                //                   fontWeight: FontWeight.bold,
+                                //                 ),
+                                //               ),
+                                //             ],
+                                //           ),
+                                //         ),
+                                //         // IconButton(
+                                //         //   icon: const Icon(Icons.edit, color: Colors.white, size: 20),
+                                //         //   onPressed: _showEventSelector,
+                                //         //   tooltip: 'Change Event',
+                                //         // ),
+                                //       ],
+                                //     ),
+                                //   ),
                                 _buildPhotoRow(cameraProvider),
-                                const SizedBox(height: 16),
-                                _buildRegistrationTypeSelector(),
                                 const SizedBox(height: 16),
                                 _buildInputField(
                                   controller: _nameController,
@@ -421,23 +445,8 @@ class _QuickRegisterScreenState extends State<QuickRegisterScreen> with EventReq
                                 ),
                                 const SizedBox(height: 16),
                                 _buildValidDateSelector(),
-                                if (_registrationType == 'group') ...[
-                                  const SizedBox(height: 16),
-                                  _buildInputField(
-                                    controller: _countController,
-                                    label: 'Group Count',
-                                    helperText: 'e.g. 5',
-                                    icon: Icons.groups_outlined,
-                                    keyboardType: TextInputType.number,
-                                    validator: (value) {
-                                      if (_registrationType == 'group' &&
-                                          (value == null || value.trim().isEmpty)) {
-                                        return 'Please enter group count';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-                                ],
+                                const SizedBox(height: 16),
+                                _buildPeopleCountSelector(),
                                 if (error != null) _buildErrorMessage(),
                                 const SizedBox(height: 16),
                                 _buildSubmitButton(cameraProvider),
@@ -469,8 +478,7 @@ class _QuickRegisterScreenState extends State<QuickRegisterScreen> with EventReq
                 color: Color(0xFF1A237E),
               ),
             ),
-            const SizedBox(width: 6),
-            Text('(optional)', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+            
           ],
         ),
         const SizedBox(height: 10),
@@ -719,14 +727,16 @@ class _QuickRegisterScreenState extends State<QuickRegisterScreen> with EventReq
     try {
       showLoadingDialog(context, "Registering Tourist...");
 
+      // Derive registration type from people count
+      final int peopleCount = int.tryParse(_countController.text.trim()) ?? 1;
+      final bool isGroupReg = peopleCount > 1;
+
       // Use ServerApi to register tourist
       final result = await ServerApi.registerTourist(
         name: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
-        isGroup: _registrationType == 'group',
-        groupCount: _registrationType == 'group'
-            ? int.tryParse(_countController.text) ?? 1
-            : 1,
+        isGroup: isGroupReg,
+        groupCount: peopleCount,
         registeredEventId: registeredEventId!,
         validDate: _selectedValidDate,
         imageFile: cameraProvider.capturedImage != null

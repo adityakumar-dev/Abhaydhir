@@ -273,11 +273,11 @@ class _ManualCodeEntryState extends State<ManualCodeEntry>
     final isReentry = result['is_reentry'] ?? false;
     final entryNumber = result['entry_number'] ?? 1;
     final totalEntries = result['total_entries_today'] ?? 1;
-    final name = result['name'] ?? 'Tourist';
-    final phone = result['phone'] ?? 'N/A';
+    final name = result['name']?.toString() ?? 'Tourist';
+    final phone = result['phone']?.toString() ?? 'N/A';
     final isGroup = result['is_group'] ?? false;
     final groupCount = result['group_count'] ?? 1;
-    final message = result['message'] ?? 'Entry registered successfully';
+    final message = result['message']?.toString() ?? 'Entry registered successfully';
 
     showDialog(
       context: context,

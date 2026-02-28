@@ -480,12 +480,21 @@ class ServerApi {
       if (response.statusCode == 201) {
         return json.decode(response.body) as Map<String, dynamic>;
       } else {
+        String errorMsg = 'Entry failed';
+        try {
+          final body = json.decode(response.body);
+          if (body is Map) {
+            errorMsg = body['detail']?.toString() ??
+                body['message']?.toString() ??
+                errorMsg;
+          }
+        } catch (_) {}
         _handleError('createEntry', response.body);
-        return null;
+        throw Exception(errorMsg);
       }
     } catch (e) {
       _handleError('createEntry', e);
-      return null;
+      rethrow;
     }
   }
 

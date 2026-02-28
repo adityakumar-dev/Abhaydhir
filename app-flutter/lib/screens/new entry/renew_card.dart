@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'short_code_renewal.dart';
 import 'phone_renewal.dart';
 
@@ -146,6 +147,24 @@ class _RenewCardState extends State<RenewCard> {
                         );
                       },
                     ),
+                    const SizedBox(height: 16),
+                    // QR Scan Renewal Card
+                    _buildMethodCard(
+                      context,
+                      icon: Icons.qr_code_scanner,
+                      iconBgColor: Colors.deepPurple,
+                      title: 'QR Scan Renewal',
+                      subtitle: 'Scan Your QR Code',
+                      description: 'Scan the QR on your visitor card to renew',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const _QrRenewalScannerScreen(),
+                          ),
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -255,4 +274,143 @@ class _RenewCardState extends State<RenewCard> {
       ),
     );
   }
+}
+// ─────────────────────────────────────────────────────────────────────────────
+// QR Renewal Scanner – scans a QR and opens ShortCodeRenewal with the result
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _QrRenewalScannerScreen extends StatefulWidget {
+  const _QrRenewalScannerScreen();
+
+  @override
+  State<_QrRenewalScannerScreen> createState() =>
+      _QrRenewalScannerScreenState();
+}
+
+class _QrRenewalScannerScreenState extends State<_QrRenewalScannerScreen> {
+  final MobileScannerController _controller = MobileScannerController();
+  bool _detected = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onDetect(BarcodeCapture capture) {
+    if (_detected) return;
+    final rawValue = capture.barcodes.firstOrNull?.rawValue;
+    if (rawValue == null || rawValue.trim().isEmpty) return;
+
+    setState(() => _detected = true);
+    _controller.stop();
+
+    // Replace scanner with ShortCodeRenewal so Back returns to RenewCard
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ShortCodeRenewal(shortCode: rawValue.trim()),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Scan QR to Renew',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.flash_on, color: Colors.white),
+            onPressed: () => _controller.toggleTorch(),
+            tooltip: 'Toggle torch',
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          // Full-screen camera
+          MobileScanner(
+            controller: _controller,
+            onDetect: _onDetect,
+          ),
+          // Dark overlay with scan window
+          CustomPaint(
+            size: MediaQuery.of(context).size,
+            painter: _ScanOverlayPainter(),
+          ),
+          // Instruction label
+          Align(
+            alignment: const Alignment(0, 0.72),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: const Text(
+                'Point camera at the QR code on your card',
+                style: TextStyle(color: Colors.white, fontSize: 13),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Draws a semi-transparent overlay with a clear square scan window.
+class _ScanOverlayPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    const double windowSize = 260;
+    final double left = (size.width - windowSize) / 2;
+    final double top = (size.height - windowSize) / 2 - 40;
+    final Rect window = Rect.fromLTWH(left, top, windowSize, windowSize);
+
+    final Paint dark = Paint()..color = Colors.black.withOpacity(0.55);
+    final Path path = Path()
+      ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))
+      ..addRRect(RRect.fromRectAndRadius(window, const Radius.circular(16)))
+      ..fillType = PathFillType.evenOdd;
+    canvas.drawPath(path, dark);
+
+    // Corner brackets
+    final Paint bracket = Paint()
+      ..color = const Color(0xFF00897B)
+      ..strokeWidth = 4
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    const double bLen = 24;
+    final r = window;
+    // TL
+    canvas.drawLine(Offset(r.left, r.top + bLen), Offset(r.left, r.top), bracket);
+    canvas.drawLine(Offset(r.left, r.top), Offset(r.left + bLen, r.top), bracket);
+    // TR
+    canvas.drawLine(Offset(r.right - bLen, r.top), Offset(r.right, r.top), bracket);
+    canvas.drawLine(Offset(r.right, r.top), Offset(r.right, r.top + bLen), bracket);
+    // BL
+    canvas.drawLine(Offset(r.left, r.bottom - bLen), Offset(r.left, r.bottom), bracket);
+    canvas.drawLine(Offset(r.left, r.bottom), Offset(r.left + bLen, r.bottom), bracket);
+    // BR
+    canvas.drawLine(Offset(r.right - bLen, r.bottom), Offset(r.right, r.bottom), bracket);
+    canvas.drawLine(Offset(r.right, r.bottom), Offset(r.right, r.bottom - bLen), bracket);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

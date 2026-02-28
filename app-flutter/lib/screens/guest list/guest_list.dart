@@ -148,6 +148,8 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
 
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounceTimer;
+  int _currentOffset = 0;
+  static const int _pageSize = 20;
 
   // Fixed event dates
   static const List<Map<String, String>> _availableDates = [
@@ -173,6 +175,7 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
   }
 
   void _onScroll() {
+    if (_isLoadingMore || !_hasMoreData || isLoading) return;
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200) {
       _loadMoreGuests();
@@ -180,8 +183,48 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
   }
 
   Future<void> _loadMoreGuests() async {
-    // Pagination disabled for now - using single event fetch
-    return;
+    if (_isLoadingMore || !_hasMoreData || isLoading) return;
+
+    final eventId = getEventId(context);
+    if (eventId == null) return;
+
+    // Set synchronously BEFORE any await to prevent race with _onScroll
+    _isLoadingMore = true;
+    setState(() {});
+
+    try {
+      final result = await ServerApi.getTouristsByEvent(
+        eventId,
+        date: _selectedDate,
+        limit: _pageSize,
+        offset: _currentOffset,
+      );
+
+      if (!mounted) return;
+
+      if (result != null && result['tourists'] != null) {
+        final touristsData = result['tourists'] as List;
+        final newGuests = touristsData
+            .map((t) => Guest.fromJson(t))
+            .toList();
+
+        setState(() {
+          guests.addAll(newGuests);
+          _currentOffset += touristsData.length; // record-based: 0 → 20 → 40 → 60
+          _hasMoreData = touristsData.length >= _pageSize;
+          _isLoadingMore = false;
+        });
+        _filterGuests();
+      } else {
+        setState(() {
+          _hasMoreData = false;
+          _isLoadingMore = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading more guests: $e');
+      if (mounted) setState(() => _isLoadingMore = false);
+    }
   }
 
   void _filterGuests() {
@@ -224,11 +267,17 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
         isLoading = true;
         error = null;
         _loadedGuestIds.clear();
-        _hasMoreData = false; // Disable pagination for now
+        _currentOffset = 0;
+        _hasMoreData = true;
       });
 
       // Use ServerApi to get tourists by event
-      final result = await ServerApi.getTouristsByEvent(eventId, date: _selectedDate);
+      final result = await ServerApi.getTouristsByEvent(
+        eventId,
+        date: _selectedDate,
+        limit: _pageSize,
+        offset: 0,
+      );
 
       if (!mounted) return;
 
@@ -240,7 +289,7 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
         }).toList();
         
         // Add all guest IDs to the set
-        _loadedGuestIds.addAll(newGuests.map((guest) => guest.uniqueId));
+        _loadedGuestIds.addAll(newGuests.map((guest) => guest.userId.toString()));
 
         // Get statistics from backend response - NEW STRUCTURE
         final stats = result['statistics'] as Map<String, dynamic>? ?? {};
@@ -260,9 +309,11 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
           withEntryTodayMembers = stats['with_entry_today_members'] ?? 0;
           
           guests = newGuests;
-          filteredGuests = newGuests;
+          _currentOffset = newGuests.length;
+          _hasMoreData = newGuests.length >= _pageSize;
           isLoading = false;
         });
+        _filterGuests();
       } else {
         throw Exception('Failed to fetch tourists');
       }
@@ -447,7 +498,7 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
                           final guest = filteredGuests[index];
                           return _buildGuestCard(guest);
                         },
-                        childCount: filteredGuests.length + (_isLoadingMore || !_hasMoreData ? 1 : 0),
+                        childCount: filteredGuests.length + (_isLoadingMore || (!_hasMoreData && filteredGuests.isNotEmpty) ? 1 : 0),
                       ),
                     ),
                                     ],

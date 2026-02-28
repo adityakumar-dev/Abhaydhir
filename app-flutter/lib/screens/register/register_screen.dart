@@ -97,7 +97,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               const SizedBox(height: 10),
               Text(
-                "Fill in the details below to register. You need an API key to register as admin or security personnel.",
+                "Fill in the details below to register. You need a valid API key to create your account.",
                 style: TextStyle(
                   fontSize: 14,
                   color: Colors.grey[600],
@@ -132,7 +132,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const SizedBox(height: 15),
               
               inputTextfield(
-                "API Key (admin/security)",
+                "API Key",
                 Icons.vpn_key_outlined,
                 _apiKeyController,
                 readOnly: false,
@@ -142,7 +142,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 5),
                 child: Text(
-                  "* Enter 'admin' or 'security' as API key",
+                  "* Enter the API key provided by your administrator",
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[600],
@@ -207,16 +207,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Validate API key
-      final apiKey = _apiKeyController.text.trim().toLowerCase();
-      if (apiKey != 'admin' && apiKey != 'security') {
-        Fluttertoast.showToast(
-          msg: "Invalid API key. Use 'admin' or 'security'",
-          backgroundColor: Colors.red,
-          textColor: Colors.white,
-        );
-        return;
-      }
+      final apiKey = _apiKeyController.text.trim();
 
       // Register user using backend API
       final result = await ServerApi.registerUser(

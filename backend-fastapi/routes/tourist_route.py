@@ -153,15 +153,15 @@ async def register_tourist(
             }).execute()
             card_public_url = f"/tourists/visitor-card/{visitor_card_token}"
 
-            if phone and background_tasks:
-                send_welcome_sms_background(
-                    background_tasks=background_tasks,
-                    to=phone,
-                    event_name="वसंतोत्सव 2026",
-                    e_id=str(code),
-                    valid_date=str(valid_date),
-                    short_code=code
-                )
+            # if phone and background_tasks:
+            #     send_welcome_sms_background(
+            #         background_tasks=background_tasks,
+            #         to=phone,
+            #         event_name="वसंतोत्सव 2026",
+            #         e_id=str(code),
+            #         valid_date=str(valid_date),
+            #         short_code=code
+            #     )
         except Exception as e:
             print(f"Error generating visitor card token: {e}")
             card_public_url = None
@@ -327,223 +327,44 @@ async def get_tourists_by_event(
     limit: int = 20,
     offset: int = 0,
     date_filter: str = Query(None, alias="date", description="Filter by valid_date (YYYY-MM-DD). Defaults to today."),
+    only_active: bool = Query(False, description="If true, return only tourists currently inside"),
     user=Depends(check_guard_admin_access)
 ):
     """
-    Fetch tourists for an event filtered by valid_date (defaults to today).
-    Pass ?date=YYYY-MM-DD to view tourists for a specific date.
+    Fetch tourists for an event (paginated) via a single Supabase RPC call.
 
-    Key behavior:
-    - Only shows tourists whose valid_date matches the requested date
-    - Entry status (inside/outside) is based on today's actual entry records
-    - "Currently inside" means: entered TODAY and no departure recorded TODAY
+    - ?date=YYYY-MM-DD   — filter by valid_date (defaults to today)
+    - ?only_active=true  — return only tourists currently inside the venue
+
+    Response shape:
+    {
+      "tourists":   [ { ...tourist, "today_entry": { has_entry_today, is_currently_inside, ... } } ],
+      "statistics": { total_tourist_registrations, total_members,
+                      currently_inside_registrations, currently_inside_members,
+                      with_entry_today_registrations, with_entry_today_members, ... },
+      "pagination": { limit, offset, count, total, date }
+    }
     """
-    from datetime import date
-    today = india_today_str()
+    today       = india_today_str()
     filter_date = date_filter or today
 
-    # Fetch tourists for the event filtered by valid_date
-    resp = (
-        supabaseAdmin.table("tourists")
-        .select("*")
-        .eq("registered_event_id", event_id)
-        .eq("valid_date", filter_date)
-        .range(offset, offset + limit - 1)
-        .order("user_id", desc=True)
-        .execute()
-    )
-    if hasattr(resp, 'error') and resp.error:
+    resp = supabaseAdmin.rpc("get_tourists_by_event", {
+        "p_event_id":    event_id,
+        "p_filter_date": filter_date,
+        "p_today":       today,
+        "p_limit":       limit,
+        "p_offset":      offset,
+        "p_only_active": only_active,
+    }).execute()
+
+    print(resp)
+    if hasattr(resp, "error") and resp.error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Error fetching tourists: {resp.error.message}",
         )
 
-    tourist_ids = [t["user_id"] for t in resp.data]
-
-    # Get total counts for tourists in this event for the filtered date
-    all_tourists_resp = (
-        supabaseAdmin.table("tourists")
-        .select("user_id, is_group, group_count")
-        .eq("registered_event_id", event_id)
-        .eq("valid_date", filter_date)
-        .execute()
-    )
-    
-    # Calculate total statistics (STATIC - never changes)
-    total_tourist_registrations = len(all_tourists_resp.data) if all_tourists_resp.data else 0
-    total_group_registrations = sum(1 for t in all_tourists_resp.data if t.get("is_group", False)) if all_tourists_resp.data else 0
-    total_individual_registrations = total_tourist_registrations - total_group_registrations
-    
-    # Calculate total members (actual people count)
-    # For groups: use group_count, for individuals: count as 1
-    total_members = 0
-    if all_tourists_resp.data:
-        for tourist in all_tourists_resp.data:
-            if tourist.get("is_group", False):
-                total_members += tourist.get("group_count", 1)
-            else:
-                total_members += 1
-    
-    # ============================================================
-    # Calculate DYNAMIC statistics (currently inside, today's entries)
-    # These are calculated from ALL tourists, not just current page
-    # ============================================================
-    all_tourist_ids = [t["user_id"] for t in all_tourists_resp.data] if all_tourists_resp.data else []
-    
-    # Fetch TODAY's entry records for ALL tourists
-    all_entries_today_resp = (
-        supabaseAdmin.table("entry_records")
-        .select("*")
-        .in_("user_id", all_tourist_ids)
-        .eq("event_id", event_id)
-        .eq("entry_date", today)
-        .execute()
-    ) if all_tourist_ids else None
-    
-    # Map all entry records by user_id
-    all_entry_records_map = {}
-    if all_entries_today_resp and hasattr(all_entries_today_resp, 'data') and all_entries_today_resp.data:
-        for record in all_entries_today_resp.data:
-            all_entry_records_map[record["user_id"]] = record
-    
-    # Fetch entry_items for today's records
-    all_record_ids = [r["record_id"] for r in all_entry_records_map.values()]
-    all_entry_items_map = {}
-    
-    if all_record_ids:
-        all_items_resp = (
-            supabaseAdmin.table("entry_items")
-            .select("*")
-            .in_("record_id", all_record_ids)
-            .execute()
-        )
-        
-        if hasattr(all_items_resp, 'data') and all_items_resp.data:
-            for item in all_items_resp.data:
-                record_id = item["record_id"]
-                if record_id not in all_entry_items_map:
-                    all_entry_items_map[record_id] = []
-                all_entry_items_map[record_id].append(item)
-    
-    # Calculate DYNAMIC statistics from ALL tourists
-    currently_inside_registrations = 0
-    currently_inside_members = 0
-    with_entry_today_registrations = 0
-    with_entry_today_members = 0
-    
-    for tourist in all_tourists_resp.data:
-        user_id = tourist["user_id"]
-        entry_record = all_entry_records_map.get(user_id)
-        
-        is_group = tourist.get("is_group", False)
-        member_count = tourist.get("group_count", 1) if is_group else 1
-        
-        if entry_record:
-            record_id = entry_record["record_id"]
-            entry_items = all_entry_items_map.get(record_id, [])
-            
-            # Check if currently inside (has open entry)
-            open_entries = [item for item in entry_items if item.get("departure_time") is None]
-            is_currently_inside = len(open_entries) > 0
-            
-            # Update statistics
-            with_entry_today_registrations += 1
-            with_entry_today_members += member_count
-            
-            if is_currently_inside:
-                currently_inside_registrations += 1
-                currently_inside_members += member_count
-    
-    # ============================================================
-    if not tourist_ids:
-        return {
-            "tourists": [],
-            "statistics": {
-                "total_tourist_registrations": total_tourist_registrations,
-                "total_individual_registrations": total_individual_registrations,
-                "total_group_registrations": total_group_registrations,
-                "total_members": total_members,
-                "currently_inside_registrations": 0,
-                "currently_inside_members": 0,
-                "with_entry_today_registrations": 0,
-                "with_entry_today_members": 0
-            },
-            "pagination": {
-                "limit": limit,
-                "offset": offset,
-                "count": 0,
-                "total": total_tourist_registrations,
-                "date": filter_date
-            }
-        }
-
-    # ============================================================
-    # NOW enrich the CURRENT PAGE tourists with today's entry info
-    # Statistics are already calculated from ALL tourists above
-    # ============================================================
-    
-    # Enrich tourist data with entry information for current page
-    for tourist in resp.data:
-        user_id = tourist["user_id"]
-        entry_record = all_entry_records_map.get(user_id)
-        
-        if entry_record:
-            record_id = entry_record["record_id"]
-            entry_items = all_entry_items_map.get(record_id, [])
-            
-            # Calculate active status (has entry without departure today)
-            open_entries = [item for item in entry_items if item.get("departure_time") is None]
-            is_currently_inside = len(open_entries) > 0
-            
-            tourist["today_entry"] = {
-                "has_entry_today": True,
-                "is_currently_inside": is_currently_inside,
-                "entry_record": entry_record,
-                "entry_items": entry_items,
-                "total_entries_today": len(entry_items),
-                "open_entries": len(open_entries),
-                "last_entry": entry_items[0] if entry_items else None
-            }
-        else:
-            tourist["today_entry"] = {
-                "has_entry_today": False,
-                "is_currently_inside": False,
-                "entry_record": None,
-                "entry_items": [],
-                "total_entries_today": 0,
-                "open_entries": 0,
-                "last_entry": None
-            }
-
-    response_data  ={
-        "tourists": resp.data,
-        "statistics": {
-            # STATIC - Total registrations (never changes, database records)
-            "total_tourist_registrations": total_tourist_registrations,
-            "total_individual_registrations": total_individual_registrations,
-            "total_group_registrations": total_group_registrations,
-            
-            # STATIC - Total members (never changes, actual people count)
-            "total_members": total_members,
-            
-            # DYNAMIC - Currently inside (updates based on TODAY's data only)
-            "currently_inside_registrations": currently_inside_registrations,
-            "currently_inside_members": currently_inside_members,
-            
-            # DYNAMIC - With entry today (updates based on TODAY's data only)
-            "with_entry_today_registrations": with_entry_today_registrations,
-            "with_entry_today_members": with_entry_today_members
-        },
-        "pagination": {
-            "limit": limit,
-            "offset": offset,
-            "count": len(resp.data),
-            "total": total_tourist_registrations,
-            "date": filter_date
-        }
-    }
-    print(response_data)
-    return response_data
+    return resp.data
 
 # ------------------------------------------------------------
 # GET SINGLE TOURIST (Admin or Guard)

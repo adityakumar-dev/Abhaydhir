@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:spring_admin/utils/constants/server_endpoints.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../apis/server_api.dart';
 
 class PhoneRenewal extends StatefulWidget {
@@ -12,9 +14,9 @@ class _PhoneRenewalState extends State<PhoneRenewal> {
   late TextEditingController _phoneController;
   String? _selectedDate;
   bool _isLoading = false;
-  final List<String> _availableDates = ['2026-02-27', '2026-02-28', '2026-03-01'];
+  final List<String> _availableDates = [ '2026-02-28', '2026-03-01'];
   final Map<String, String> _dateLabels = {
-    '2026-02-27': 'Feb 27',
+   
     '2026-02-28': 'Feb 28',
     '2026-03-01': 'Mar 1',
   };
@@ -53,8 +55,26 @@ class _PhoneRenewalState extends State<PhoneRenewal> {
         validDate: _selectedDate!,
       );
 
+      String? previewUrl;
+      String? downloadUrl;
+      try {
+        final newShortCode = (result['new_short_code'] ?? '').toString().trim();
+        if (newShortCode.isNotEmpty) {
+          final cardData = await ServerApi.resolveShortCode(shortCode: newShortCode);
+          final cardUrls = cardData['card_urls'] as Map<String, dynamic>?;
+          String toFull(String p) =>
+              p.startsWith('http') ? p : '${ServerEndpoints.baseUrl}$p';
+          if (cardUrls?['preview'] != null) {
+            previewUrl = toFull(cardUrls!['preview'] as String);
+          }
+          if (cardUrls?['download'] != null) {
+            downloadUrl = toFull(cardUrls!['download'] as String);
+          }
+        }
+      } catch (_) {}
+
       if (mounted) {
-        _showSuccessDialog(result);
+        _showSuccessDialog(result, previewUrl: previewUrl, downloadUrl: downloadUrl);
       }
     } catch (e) {
       if (mounted) {
@@ -83,15 +103,16 @@ class _PhoneRenewalState extends State<PhoneRenewal> {
     );
   }
 
-  void _showSuccessDialog(Map<String, dynamic> result) {
+  void _showSuccessDialog(Map<String, dynamic> result, {String? previewUrl, String? downloadUrl}) {
     final newShortCode = result['new_short_code'] ?? '';
     final newDate = result['new_date'] ?? _selectedDate;
     final name = result['name'] ?? 'Visitor';
+    final outerContext = context;
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         content: Column(
@@ -172,14 +193,105 @@ class _PhoneRenewalState extends State<PhoneRenewal> {
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+            if (previewUrl != null)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                    Navigator.push(
+                      outerContext,
+                      MaterialPageRoute(
+                        fullscreenDialog: true,
+                        builder: (_) => Scaffold(
+                          backgroundColor: Colors.black,
+                          appBar: AppBar(
+                            backgroundColor: Colors.black,
+                            iconTheme: const IconThemeData(color: Colors.white),
+                            title: const Text(
+                              'Card Preview',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ),
+                          body: Center(
+                            child: InteractiveViewer(
+                              minScale: 0.5,
+                              maxScale: 4.0,
+                              child: Image.network(
+                                previewUrl,
+                                loadingBuilder: (context, child, progress) {
+                                  if (progress == null) return child;
+                                  return Center(
+                                    child: CircularProgressIndicator(
+                                      value: progress.expectedTotalBytes != null
+                                          ? progress.cumulativeBytesLoaded /
+                                              progress.expectedTotalBytes!
+                                          : null,
+                                      color: Colors.white,
+                                    ),
+                                  );
+                                },
+                                errorBuilder: (_, __, ___) => const Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.broken_image,
+                                          color: Colors.white, size: 48),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        'Failed to load card',
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.visibility_rounded),
+                  label: const Text('Preview Card'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.blue,
+                    side: const BorderSide(color: Colors.blue),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+            if (previewUrl != null) const SizedBox(height: 8),
+            if (downloadUrl != null)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => launchUrl(
+                    Uri.parse(downloadUrl),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                  icon: const Icon(Icons.download_rounded),
+                  label: const Text('Download Card'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.green,
+                    side: const BorderSide(color: Colors.green),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ),
+            if (downloadUrl != null) const SizedBox(height: 8),
+            const SizedBox(height: 4),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.pop(context);
-                  Navigator.pop(context);
-                  Navigator.pop(context); // Go back to home
+                  Navigator.pop(dialogContext);
+                  _phoneController.clear();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF00897B),
@@ -189,7 +301,7 @@ class _PhoneRenewalState extends State<PhoneRenewal> {
                   ),
                 ),
                 child: const Text(
-                  'Done',
+                  'New Renewal',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -208,9 +320,10 @@ class _PhoneRenewalState extends State<PhoneRenewal> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
         backgroundColor: const Color(0xFF00897B),
         elevation: 0,
-        title: const Text('Renew by Phone'),
+        title: const Text('Renew by Phone', style: TextStyle(color: Colors.white),),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
@@ -255,7 +368,7 @@ class _PhoneRenewalState extends State<PhoneRenewal> {
               children: _availableDates.map((date) {
                 final isSelected = _selectedDate == date;
                 return ChoiceChip(
-                  label: Text(_dateLabels[date] ?? date),
+                  label: Text(_dateLabels[date] ?? date , style: TextStyle(color: isSelected ? Colors.white : Colors.black),),
                   selected: isSelected,
                   onSelected: _isLoading
                       ? null

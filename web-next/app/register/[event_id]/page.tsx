@@ -231,7 +231,7 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
               Your Entry Date <span className="text-red-500">*</span>
             </label>
             <div className="flex gap-3 flex-wrap">
-              {["2026-02-27", "2026-02-28", "2026-03-01"].map((date) => (
+              {[ "2026-02-28", "2026-03-01"].map((date) => (
                 <button
                   key={date}
                   type="button"
@@ -242,7 +242,6 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
                   }`}
                   onClick={() => setFormData({ ...formData, valid_date: date })}
                 >
-                  {date === "2026-02-27" && "27 Feb"}
                   {date === "2026-02-28" && "28 Feb"}
                   {date === "2026-03-01" && "1 Mar"}
                 </button>

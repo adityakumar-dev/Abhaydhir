@@ -153,15 +153,15 @@ async def register_tourist(
             }).execute()
             card_public_url = f"/tourists/visitor-card/{visitor_card_token}"
 
-            # if phone and background_tasks:
-            #     send_welcome_sms_background(
-            #         background_tasks=background_tasks,
-            #         to=phone,
-            #         event_name="वसंतोत्सव 2026",
-            #         e_id=str(code),
-            #         valid_date=str(valid_date),
-            #         short_code=code
-            #     )
+            if phone and background_tasks:
+                send_welcome_sms_background(
+                    background_tasks=background_tasks,
+                    to=phone,
+                    event_name="वसंतोत्सव 2026",
+                    e_id=str(code),
+                    valid_date=str(valid_date),
+                    short_code=code
+                )
         except Exception as e:
             print(f"Error generating visitor card token: {e}")
             card_public_url = None

@@ -28,11 +28,11 @@ class _QuickRegisterScreenState extends State<QuickRegisterScreen> with EventReq
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _countController = TextEditingController(text: '1');
-  String _selectedValidDate = '2026-02-28';
+  String _selectedValidDate = '2026-03-01';
   File? _uniqueIdPhotoFile;
 
   static const List<Map<String, String>> _validDates = [
-    {'label': 'Feb 28', 'value': '2026-02-28'},
+    // {'label': 'Feb 28', 'value': '2026-02-28'},
     {'label': 'Mar 1',  'value': '2026-03-01'},
   ];
 

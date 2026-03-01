@@ -19,9 +19,9 @@ class _ShortCodeRenewalState extends State<ShortCodeRenewal> {
   late TextEditingController _codeController;
   String? _selectedDate;
   bool _isLoading = false;
-  final List<String> _availableDates = [ '2026-02-28', '2026-03-01'];
+  final List<String> _availableDates = [  '2026-03-01'];
   final Map<String, String> _dateLabels = {
-    '2026-02-28': 'Feb 28',
+    
     '2026-03-01': 'Mar 1',
   };
 

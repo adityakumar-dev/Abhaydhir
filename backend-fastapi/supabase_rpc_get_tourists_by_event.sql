@@ -11,9 +11,11 @@
 --   p_limit       – page size  (default 20)
 --   p_offset      – page start (default 0)
 --   p_only_active – if TRUE, return only tourists currently inside
+--   p_search      – optional name substring search (case-insensitive)
 -- ============================================================
 
 DROP FUNCTION IF EXISTS get_tourists_by_event(BIGINT, DATE, DATE, INT, INT, BOOLEAN);
+DROP FUNCTION IF EXISTS get_tourists_by_event(BIGINT, DATE, DATE, INT, INT, BOOLEAN, TEXT);
 
 CREATE OR REPLACE FUNCTION get_tourists_by_event(
     p_event_id    BIGINT,
@@ -21,7 +23,8 @@ CREATE OR REPLACE FUNCTION get_tourists_by_event(
     p_today       DATE    DEFAULT CURRENT_DATE,
     p_limit       INT     DEFAULT 20,
     p_offset      INT     DEFAULT 0,
-    p_only_active BOOLEAN DEFAULT FALSE
+    p_only_active BOOLEAN DEFAULT FALSE,
+    p_search      TEXT    DEFAULT NULL
 )
 RETURNS JSON
 LANGUAGE plpgsql
@@ -39,8 +42,7 @@ BEGIN
             CASE WHEN t.is_group THEN COALESCE(t.group_count, 1) ELSE 1 END AS member_count
         FROM tourists t
         WHERE t.registered_event_id = p_event_id
-          AND t.valid_date           = p_filter_date
-    ),
+          AND t.valid_date           = p_filter_date          AND (p_search IS NULL OR t.name ILIKE '%' || p_search || '%')    ),
 
     -- ── 2. Today's entry records (one per user, for this event) ──────────────
     today_records AS (
@@ -154,7 +156,8 @@ BEGIN
             'offset', p_offset,
             'count',  (SELECT COUNT(*) FROM page_ids),
             'total',  (SELECT COUNT(*) FROM filtered),
-            'date',   p_filter_date::text
+            'date',   p_filter_date::text,
+            'search', p_search
         )
     ) INTO v_result;
 
@@ -162,5 +165,5 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION get_tourists_by_event(BIGINT, DATE, DATE, INT, INT, BOOLEAN)
+GRANT EXECUTE ON FUNCTION get_tourists_by_event(BIGINT, DATE, DATE, INT, INT, BOOLEAN, TEXT)
     TO anon, authenticated, service_role;

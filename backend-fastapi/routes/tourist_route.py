@@ -328,13 +328,15 @@ async def get_tourists_by_event(
     offset: int = 0,
     date_filter: str = Query(None, alias="date", description="Filter by valid_date (YYYY-MM-DD). Defaults to today."),
     only_active: bool = Query(False, description="If true, return only tourists currently inside"),
+    search: str = Query(None, description="Search tourists by name (case-insensitive substring)"),
     user=Depends(check_guard_admin_access)
 ):
     """
     Fetch tourists for an event (paginated) via a single Supabase RPC call.
 
-    - ?date=YYYY-MM-DD   — filter by valid_date (defaults to today)
-    - ?only_active=true  — return only tourists currently inside the venue
+    - ?date=YYYY-MM-DD      — filter by valid_date (defaults to today)
+    - ?only_active=true     — return only tourists currently inside the venue
+    - ?search=ravi          — filter by name (case-insensitive, partial match)
 
     Response shape:
     {
@@ -355,9 +357,9 @@ async def get_tourists_by_event(
         "p_limit":       limit,
         "p_offset":      offset,
         "p_only_active": only_active,
+        "p_search":      search or None,
     }).execute()
 
-    print(resp)
     if hasattr(resp, "error") and resp.error:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

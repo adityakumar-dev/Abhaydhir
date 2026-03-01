@@ -157,7 +157,7 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
     {'label': 'Feb 28', 'value': '2026-02-28'},
     {'label': 'Mar 1',  'value': '2026-03-01'},
   ];
-  String _selectedDate = '2026-02-27';
+  String _selectedDate = '2026-03-01';
 
   @override
   void initState() {

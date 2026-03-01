@@ -63,7 +63,7 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
     group_count: 1,
     photo: null as File | null,
     unique_id_photo: null as File | null,
-    valid_date: "",
+    valid_date: "2026-03-01",
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -226,28 +226,12 @@ export default function RegisterPage({ params }: { params: { event_id: string } 
               autoComplete="name"
             />
           </div>
-          <div className="space-y-3">
+          {/* <div className="space-y-3">
             <label className="block text-sm font-semibold text-gray-800">
               Your Entry Date <span className="text-red-500">*</span>
             </label>
-            <div className="flex gap-3 flex-wrap">
-              {[ "2026-02-28", "2026-03-01"].map((date) => (
-                <button
-                  key={date}
-                  type="button"
-                  className={`flex-1 min-w-[100px] px-4 py-3 rounded-lg border-2 transition-all font-semibold text-sm ${
-                    formData.valid_date === date
-                      ? "bg-gradient-to-br from-yellow-500 to-orange-500 text-white border-yellow-600 shadow-lg shadow-yellow-300/50"
-                      : "bg-white text-gray-700 border-gray-200 hover:border-yellow-400 hover:bg-yellow-50"
-                  }`}
-                  onClick={() => setFormData({ ...formData, valid_date: date })}
-                >
-                  {date === "2026-02-28" && "28 Feb"}
-                  {date === "2026-03-01" && "1 Mar"}
-                </button>
-              ))}
-            </div>
-          </div>
+           
+          </div> */}
           <div className="space-y-3">
             <label className="block text-sm font-semibold text-gray-800">
               Phone Number <span className="text-red-500">*</span>

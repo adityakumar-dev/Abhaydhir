@@ -1,5 +1,6 @@
 from fastapi import Request, HTTPException, status, Depends
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 from utils.supabase.supabase import supabaseAdmin
 from utils.supabase.auth import jwt_middleware
 from datetime import datetime
@@ -13,6 +14,69 @@ TARGET_DATES = [
     "2026-02-28",
     "2026-03-01"
 ]
+
+TARGET_DATE_DATA = {
+    '2026-03-01': {
+        "registration": {
+            "total_registration": 4875,
+            "total_members": 13681,
+            "total_groups": 4137,
+            "total_individual": 738,
+        },
+        "Camera": {
+            "exit-cam": {
+                "Count": 8340,
+                "Happy": 7208,
+                "Sad": 1018,
+                "undetected" : 114
+            },
+            "entry-cam": {
+                "unique_count": 16910,
+                "duplicacy_count": 6157
+            }
+        }
+    },
+    '2026-02-28': {
+        "registration": {
+            "total_registration": 5204,
+            "total_members": 15074,
+            "total_groups": 4298,
+            "total_individual": 906,
+        },
+        "Camera": {
+            "exit-cam": {
+                "Count": 8546,
+                "Happy": 7242,
+                "Sad": 1152,
+                "undetected": 152
+            },
+            "entry-cam": {
+                "unique_count": 16207,
+                "duplicacy_count": 6452
+            }
+        }
+    },
+    '2026-02-27': {
+        "registration": {
+            "total_registration": 1805,
+            "total_members": 6148,
+            "total_groups": 1273,
+            "total_individual": 532,
+        },
+        "Camera": {
+            "exit-cam": {
+                "Count": 3696,
+                "Happy": 2956,  # 89%
+                "Sad": 483,    # 8%
+                "undetected": 257  # remaining 3%
+            },
+            "entry-cam": {
+                "unique_count": 5561,
+                "duplicacy_count": 2796
+            }
+        }
+    }
+}
 
 
 @router.get("/camera")
@@ -82,34 +146,33 @@ async def camera_dashboard(request: Request):
         },
         "recent_captures": recent[:20],
     }
-
+class OnboardingRequest(BaseModel):
+    event_id : str = "1"
 
 @router.post("/onboarding")
-async def onboarding(request: Request):
+async def onboarding(onboarding_request: OnboardingRequest, request: Request):
     user = await jwt_middleware(request)
     if user.get("role") != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have permission to access this resource."
         )
-    response = (
-        supabaseAdmin
-        .rpc("get_admin_dashboard",
-             {"event_id_param": EVENT_ID})
-        .execute()
-    )
-    print("RPC Response: ", response)
-
+    try :
+            response = (
+            supabaseAdmin
+            .rpc("get_event_full_summary",
+                {"p_event_id": onboarding_request.event_id})
+            .execute()
+            )
+            print("RPC Response: ", response)
+            return response.data
+    except Exception as e:
+        print("Error during RPC call: ", str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An error occurred while fetching the onboarding data."
+        )
     # -------------------------
     # Final Structured Response
     # -------------------------
-    data = response.data or {}
-    return {
-        "total_registered": data.get("total_registered", 0),
-        "currently_inside": data.get("currently_inside", 0),
-        "feedback_submissions": data.get("feedback_count", 0),
-        "date_wise": {
-            "registrations": data.get("registration_counts", {}),
-            "entries": data.get("entry_counts", {})
-        }
-    }
+ 

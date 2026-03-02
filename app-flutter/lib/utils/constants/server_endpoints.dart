@@ -44,10 +44,26 @@ class ServerEndpoints {
       '$baseUrl/tourists/?limit=$limit&offset=$offset';
   
   // Get tourists by event (Admin/Security)
-  static String getTouristsByEvent(int eventId, {String? date, int limit = 20, int offset = 0}) => 
-      date != null
-          ? '$baseUrl/tourists/event/$eventId?date=$date&limit=$limit&offset=$offset'
-          : '$baseUrl/tourists/event/$eventId?limit=$limit&offset=$offset';
+  static String getTouristsByEvent(
+    int eventId, {
+    String? date,
+    int limit = 20,
+    int offset = 0,
+    String? search,
+    bool onlyActive = false,
+  }) {
+    final params = <String, String>{
+      'limit': limit.toString(),
+      'offset': offset.toString(),
+    };
+    if (date != null && date.isNotEmpty) params['date'] = date;
+    if (search != null && search.isNotEmpty) params['search'] = search;
+    if (onlyActive) params['only_active'] = 'true';
+    final query = params.entries
+        .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
+        .join('&');
+    return '$baseUrl/tourists/event/$eventId?$query';
+  }
   
   // Get single tourist by ID (Admin/Security)
   static String getTouristById(int userId) => '$baseUrl/tourists/$userId';

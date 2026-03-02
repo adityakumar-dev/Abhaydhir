@@ -1,11 +1,7 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
-import 'package:spring_admin/utils/constants/server_endpoints.dart';
-import 'dart:convert';
 
 class CameraSettingsProvider extends ChangeNotifier {
   static const String _frontCameraRotationKey = 'front_camera_rotation_angle';
@@ -79,9 +75,13 @@ class CameraSettingsProvider extends ChangeNotifier {
     }
   }
 
-  void disposeCamera() async {
-    await controller!.dispose();
+  Future<void> disposeCamera() async {
+    if (controller == null) return;
+    try {
+      await controller!.dispose();
+    } catch (_) {}
     controller = null;
+    isInitializing = true;
     notifyListeners();
   }
 

@@ -288,6 +288,8 @@ class ServerApi {
     String? date,
     int limit = 20,
     int offset = 0,
+    String? search,
+    bool onlyActive = false,
   }) async {
     try {
       final response = await http.get(
@@ -296,6 +298,8 @@ class ServerApi {
           date: date,
           limit: limit,
           offset: offset,
+          search: search,
+          onlyActive: onlyActive,
         )),
         headers: await _buildHeaders(),
       );

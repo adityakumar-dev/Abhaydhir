@@ -132,6 +132,7 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
   final ScrollController _scrollController = ScrollController();
   bool _isLoadingMore = false;
   bool _hasMoreData = true;
+  bool _isSearching = false;
 
   // Statistics variables
   Map<String, dynamic> statistics = {};
@@ -193,11 +194,14 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
     setState(() {});
 
     try {
+      final searchQuery = _searchController.text.trim();
       final result = await ServerApi.getTouristsByEvent(
         eventId,
         date: _selectedDate,
         limit: _pageSize,
         offset: _currentOffset,
+        search: searchQuery.isEmpty ? null : searchQuery,
+        onlyActive: _showActiveOnly,
       );
 
       if (!mounted) return;
@@ -227,26 +231,16 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
     }
   }
 
+  // Filtering is now server-side; this just syncs the display list.
   void _filterGuests() {
-    setState(() {
-      List<Guest> filtered = guests;
-      
-      // Apply active filter
-      if (_showActiveOnly) {
-        filtered = filtered.where((guest) => guest.isCurrentlyInside).toList();
-      }
-      
-      // Apply search filter
-      final searchQuery = _searchController.text;
-      if (searchQuery.isEmpty) {
-        filteredGuests = filtered;
-      } else {
-        filteredGuests = filtered.where((guest) {
-          return guest.name.toLowerCase().contains(searchQuery.toLowerCase()) ||
-              guest.phone.toLowerCase().contains(searchQuery.toLowerCase());
-        }).toList();
-      }
-    });
+    setState(() => filteredGuests = guests);
+  }
+
+  /// Debounced entry point when the user types in the search field.
+  void _triggerSearch(String value) {
+    _debounceTimer?.cancel();
+    if (!_isSearching) setState(() => _isSearching = true);
+    _debounceTimer = Timer(const Duration(milliseconds: 500), fetchGuests);
   }
 
   Future<void> fetchGuests() async {
@@ -272,11 +266,14 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
       });
 
       // Use ServerApi to get tourists by event
+      final searchQuery = _searchController.text.trim();
       final result = await ServerApi.getTouristsByEvent(
         eventId,
         date: _selectedDate,
         limit: _pageSize,
         offset: 0,
+        search: searchQuery.isEmpty ? null : searchQuery,
+        onlyActive: _showActiveOnly,
       );
 
       if (!mounted) return;
@@ -312,6 +309,7 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
           _currentOffset = newGuests.length;
           _hasMoreData = newGuests.length >= _pageSize;
           isLoading = false;
+          _isSearching = false;
         });
         _filterGuests();
       } else {
@@ -328,6 +326,7 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
       setState(() {
         error = 'Failed to load guests. Please try again.';
         isLoading = false;
+        _isSearching = false;
       });
     }
   }
@@ -391,10 +390,28 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
                             padding: const EdgeInsets.all(16),
                             child: TextField(
                               controller: _searchController,
-                              onChanged: (value) => _filterGuests(),
+                              onChanged: _triggerSearch,
                               decoration: InputDecoration(
-                                hintText: 'Search by name or email',
+                                hintText: 'Search by name or phone…',
                                 prefixIcon: const Icon(Icons.search),
+                                suffixIcon: _isSearching
+                                    ? const Padding(
+                                        padding: EdgeInsets.all(12),
+                                        child: SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        ),
+                                      )
+                                    : _searchController.text.isNotEmpty
+                                        ? IconButton(
+                                            icon: const Icon(Icons.clear),
+                                            onPressed: () {
+                                              _searchController.clear();
+                                              fetchGuests();
+                                            },
+                                          )
+                                        : null,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   borderSide: BorderSide(
@@ -425,10 +442,8 @@ class _GuestListsScreenState extends State<GuestListsScreen> with EventRequiredM
                                   ),
                                   selected: _showActiveOnly,
                                   onSelected: (selected) {
-                                    setState(() {
-                                      _showActiveOnly = selected;
-                                      _filterGuests();
-                                    });
+                                    setState(() => _showActiveOnly = selected);
+                                    fetchGuests();
                                   },
                                   selectedColor: Colors.green,
                                   labelStyle: TextStyle(

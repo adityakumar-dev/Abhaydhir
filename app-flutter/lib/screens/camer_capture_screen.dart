@@ -29,7 +29,22 @@ class _CameraCaptureScreenState extends State<CameraCaptureScreen> with WidgetsB
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    // Release camera hardware so Android stops showing the camera-in-use indicator
+    cameraProvider?.disposeCamera();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final controller = cameraProvider?.controller;
+    if (controller == null || !controller.value.isInitialized) return;
+
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
+      cameraProvider?.disposeCamera();
+    } else if (state == AppLifecycleState.resumed) {
+      cameraProvider?.initCamera();
+    }
   }
 
   @override

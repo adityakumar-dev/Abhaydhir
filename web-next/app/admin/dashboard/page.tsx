@@ -240,6 +240,39 @@ export default function AdminDashboard() {
 
   const renderHome = () => (
     <div className="space-y-6">
+
+      {/* ── Quick Links ── */}
+      <div className="bg-white rounded-xl shadow-md p-5 border border-amber-100">
+        <div className="flex items-center gap-2 mb-4">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+          </svg>
+          <h3 className="text-xs font-bold tracking-widest uppercase text-amber-700">Quick Links</h3>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => router.push('/admin/dashboard/spring_festival_2026')}
+            className="group flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-amber-200 bg-gradient-to-br from-amber-50 to-yellow-50 hover:border-amber-400 hover:shadow-md transition-all duration-200"
+          >
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+            </div>
+            <div className="text-left">
+              <div className="text-sm font-700 text-amber-900 font-semibold group-hover:text-amber-700 transition-colors">Spring Festival 2026</div>
+              <div className="text-xs text-amber-600 opacity-80">Event dashboard · Feb 27 – Mar 1</div>
+            </div>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="ml-1 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white rounded-xl shadow-md p-6">
           <h3 className="text-sm font-medium text-gray-500 mb-2">Total Events</h3>
